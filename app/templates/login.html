@@ -25,8 +25,16 @@
                 <input type="text" name="username" required autofocus autocomplete="username" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
             </div>
             <div>
-                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Password</label>
-                <input type="password" name="password" required autocomplete="current-password" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold">Password</label>
+                    <a href="/reset-password" class="text-xs text-amber-400 hover:underline">Forgot password?</a>
+                </div>
+                <div class="relative">
+                    <input type="password" id="login_pass" name="password" required autocomplete="current-password" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 pr-10 text-white focus:outline-none focus:border-indigo-500">
+                    <button type="button" onclick="toggleLoginPass()" class="absolute right-3 top-2.5 text-slate-400 hover:text-white select-none">
+                        <span id="login_eye">👁️</span>
+                    </button>
+                </div>
             </div>
             <div class="flex items-center justify-between py-1">
                 <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300 select-none">
@@ -43,5 +51,19 @@
             Naya account banana hai? <a href="/signup" class="text-indigo-400 font-semibold hover:underline">Sign Up karein</a>
         </p>
     </div>
+
+    <script>
+        function toggleLoginPass() {
+            const input = document.getElementById('login_pass');
+            const eye = document.getElementById('login_eye');
+            if (input.type === 'password') {
+                input.type = 'text';
+                eye.innerText = '🙈';
+            } else {
+                input.type = 'password';
+                eye.innerText = '👁️';
+            }
+        }
+    </script>
 </body>
 </html>

@@ -24,13 +24,11 @@ COOKIE_NAME = "rent_access_token"
 app = FastAPI(title="Rent Manager Pro")
 templates = Jinja2Templates(directory="app/templates")
 
-# Upload Directories
 os.makedirs("uploads/photos", exist_ok=True)
 os.makedirs("uploads/documents", exist_ok=True)
 os.makedirs("uploads/police_docs", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Include Dedicated Police Module Router
 app.include_router(police_router)
 
 @app.on_event("startup")
@@ -81,7 +79,7 @@ async def save_uploaded_file(file: UploadFile, subfolder: str) -> Optional[str]:
         shutil.copyfileobj(file.file, buffer)
     return f"/uploads/{subfolder}/{unique_filename}"
 
-# --- AUTH ROUTES ---
+# --- AUTH & PASSWORD RESET ROUTES ---
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
@@ -108,6 +106,36 @@ async def login_action(
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(key=COOKIE_NAME, value=token, httponly=True, max_age=cookie_max_age)
     return response
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": None})
+
+@app.post("/reset-password")
+async def reset_password_action(
+    request: Request,
+    username: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    if new_password != confirm_password:
+        return templates.TemplateResponse(
+            request=request, name="reset_password.html", context={"error": "Dono password match nahi hue!", "msg": None}
+        )
+
+    result = await db.execute(select(User).where(User.username == username.strip()))
+    user = result.scalar_one_or_none()
+    if not user:
+        return templates.TemplateResponse(
+            request=request, name="reset_password.html", context={"error": "Yeh username registered nahi hai!", "msg": None}
+        )
+
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+    return templates.TemplateResponse(
+        request=request, name="reset_password.html", context={"error": None, "msg": "Password kamyabi se update ho gaya! Ab aap login kar sakte hain."}
+    )
 
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
@@ -139,7 +167,7 @@ async def logout():
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# --- MAIN DASHBOARD ---
+# --- DASHBOARD & CRUD ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_current_user(request, db)
@@ -239,14 +267,12 @@ async def edit_tenant(
         tenant.monthly_rent = monthly_rent
         tenant.id_type = id_type
         tenant.id_number = id_number.strip()
-        
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
             tenant.photo_path = new_photo
         new_doc = await save_uploaded_file(id_doc, "documents")
         if new_doc:
             tenant.id_document_path = new_doc
-            
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -327,14 +353,12 @@ async def edit_family_member(
         member.age = age
         member.id_type = id_type
         member.id_number = id_number.strip()
-        
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
             member.photo_path = new_photo
         new_doc = await save_uploaded_file(id_doc, "documents")
         if new_doc:
             member.id_document_path = new_doc
-            
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
