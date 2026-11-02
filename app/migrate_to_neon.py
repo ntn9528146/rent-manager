@@ -8,8 +8,8 @@ from app.database import Base, User, Tenant, FamilyMember, RentPayment, PoliceVe
 
 load_dotenv()
 
-# LOCAL DATABASE URL (Agar local postgres ka password alag ho toh yahan change karein)
-LOCAL_DB_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/rent_db"
+# LOCAL DATABASE URL with password 'root'
+LOCAL_DB_URL = "postgresql+asyncpg://postgres:root@localhost:5432/rent_db"
 
 # NEON CLOUD DATABASE URL
 NEON_DB_URL = os.getenv("DATABASE_URL")
@@ -19,20 +19,19 @@ async def migrate_data():
         print("❌ Error: .env file me valid Neon DATABASE_URL nahi mila!")
         return
 
-    print("🚀 Connecting to Local and Neon Databases...")
+    print("🚀 Connecting to Local (root) and Neon Databases...")
     local_engine = create_async_engine(LOCAL_DB_URL)
     neon_engine = create_async_engine(NEON_DB_URL)
 
     LocalSession = async_sessionmaker(local_engine, expire_on_commit=False)
     NeonSession = async_sessionmaker(neon_engine, expire_on_commit=False)
 
-    # Step 1: Ensure Tables exist on Neon
     async with neon_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Neon schema ready.")
+    print("✅ Neon schema verified.")
 
     async with LocalSession() as local_db, NeonSession() as neon_db:
-        # Migrate Users
+        # 1. Migrate Users
         users = (await local_db.execute(select(User))).scalars().all()
         for u in users:
             existing = (await neon_db.execute(select(User).where(User.username == u.username))).scalar_one_or_none()
@@ -41,7 +40,7 @@ async def migrate_data():
         await neon_db.commit()
         print(f"✅ Users migrated: {len(users)}")
 
-        # Migrate Tenants
+        # 2. Migrate Tenants
         tenants = (await local_db.execute(select(Tenant))).scalars().all()
         for t in tenants:
             existing = (await neon_db.execute(select(Tenant).where(Tenant.id == t.id))).scalar_one_or_none()
@@ -62,7 +61,7 @@ async def migrate_data():
         await neon_db.commit()
         print(f"✅ Tenants migrated: {len(tenants)}")
 
-        # Migrate Family Members
+        # 3. Migrate Family Members
         members = (await local_db.execute(select(FamilyMember))).scalars().all()
         for m in members:
             existing = (await neon_db.execute(select(FamilyMember).where(FamilyMember.id == m.id))).scalar_one_or_none()
@@ -82,7 +81,7 @@ async def migrate_data():
         await neon_db.commit()
         print(f"✅ Family Members migrated: {len(members)}")
 
-        # Migrate Rent Payments & Meter Readings
+        # 4. Migrate Payments & Meter Readings
         payments = (await local_db.execute(select(RentPayment))).scalars().all()
         for p in payments:
             existing = (await neon_db.execute(select(RentPayment).where(RentPayment.id == p.id))).scalar_one_or_none()
@@ -107,7 +106,7 @@ async def migrate_data():
         await neon_db.commit()
         print(f"✅ Rent Payments migrated: {len(payments)}")
 
-        # Migrate Police Verification Records
+        # 5. Migrate Police Verifications
         verifs = (await local_db.execute(select(PoliceVerification))).scalars().all()
         for v in verifs:
             existing = (await neon_db.execute(select(PoliceVerification).where(PoliceVerification.id == v.id))).scalar_one_or_none()
@@ -127,7 +126,7 @@ async def migrate_data():
 
     await local_engine.dispose()
     await neon_engine.dispose()
-    print("🎉 ALL LOCAL RECORDS SUCCESSFULLY UPLOADED TO NEON CLOUD!")
+    print("🎉 ALL LOCAL RECORDS SUCCESSFULLY TRANSFERRED TO NEON CLOUD!")
 
 if __name__ == "__main__":
     asyncio.run(migrate_data())
