@@ -1,9 +1,14 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy[asyncio]
 asyncpg
 psycopg2-binary
+greenlet
 jinja2
 python-multipart
 pydantic
 python-dotenv
+passlib[bcrypt]
+bcrypt
+python-jose[cryptography]
+aiofiles
