@@ -15,6 +15,14 @@ async_session = async_sessionmaker(engine, expire_on_commit=False)
 class Base(DeclarativeBase):
     pass
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(100), nullable=True)
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -22,21 +30,48 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     room_number: Mapped[str] = mapped_column(String(50), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
-    monthly_rent: Mapped[float] = mapped_column(Float, nullable=False)
+    monthly_rent: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # ID Details & Photo
+    id_type: Mapped[str] = mapped_column(String(50), default="Aadhar Card") # Aadhar Card / Voter ID / PAN
+    id_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    id_document_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    photo_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    
     joining_date: Mapped[date] = mapped_column(Date, default=date.today)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
 
+    members: Mapped[list["FamilyMember"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     payments: Mapped[list["RentPayment"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+
+class FamilyMember(Base):
+    __tablename__ = "family_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    relation: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. Wife, Son, Mother
+    age: Mapped[int] = mapped_column(Integer, nullable=True)
+    photo_path: Mapped[str] = mapped_column(String(255), nullable=True)
+
+    tenant: Mapped["Tenant"] = relationship(back_populates="members")
 
 class RentPayment(Base):
     __tablename__ = "rent_payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
-    amount_paid: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # 4 distinct rent columns
+    fixed_rent: Mapped[float] = mapped_column(Float, default=0.0)
+    water_bill: Mapped[float] = mapped_column(Float, default=0.0)
+    electricity_bill: Mapped[float] = mapped_column(Float, default=0.0)
+    other_charges: Mapped[float] = mapped_column(Float, default=0.0)
+    total_paid: Mapped[float] = mapped_column(Float, default=0.0)
+
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
-    for_month: Mapped[str] = mapped_column(String(20), nullable=False) # e.g., "Nov 2026"
-    payment_mode: Mapped[str] = mapped_column(String(50), default="UPI/Cash")
+    for_month: Mapped[str] = mapped_column(String(20), nullable=False)
+    payment_mode: Mapped[str] = mapped_column(String(50), default="UPI")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="payments")

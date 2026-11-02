@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Rent Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen px-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-indigo-400">Rent Manager</h1>
+            <p class="text-sm text-slate-400 mt-1">Kirayedar Records Portal Login</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-rose-500/20 border border-rose-500 text-rose-300 px-4 py-2 rounded-lg text-sm mb-6">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/login" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Username</label>
+                <input type="text" name="username" required autofocus class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Password</label>
+                <input type="password" name="password" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-900/40">
+                Log In
+            </button>
+        </form>
+
+        <p class="text-center text-sm text-slate-400 mt-6">
+            Naya account banana hai? <a href="/signup" class="text-indigo-400 font-semibold hover:underline">Sign Up karein</a>
+        </p>
+    </div>
+</body>
+</html>
