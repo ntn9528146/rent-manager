@@ -31,10 +31,20 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(police_router)
 
+def safe_float(val: Optional[str], default: float = 0.0) -> float:
+    if val is None:
+        return default
+    val_str = str(val).strip()
+    if not val_str:
+        return default
+    try:
+        return float(val_str)
+    except (ValueError, TypeError):
+        return default
+
 @app.on_event("startup")
 async def on_startup():
     await init_db()
-    # Auto fix postgres sequence after migrations
     try:
         async with engine.begin() as conn:
             await conn.execute(text("""
@@ -45,7 +55,7 @@ async def on_startup():
                 SELECT setval(pg_get_serial_sequence('users', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM users;
             """))
     except Exception as e:
-        print(f"Sequence sync note: {e}")
+        print(f"Startup sequence sync notice: {e}")
 
 async def get_db():
     async with async_session() as session:
@@ -91,7 +101,7 @@ async def save_uploaded_file(file: Optional[UploadFile], subfolder: str) -> Opti
         shutil.copyfileobj(file.file, buffer)
     return f"/uploads/{subfolder}/{unique_filename}"
 
-# --- AUTH & PASSWORD RESET ROUTES ---
+# --- AUTH ROUTES ---
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
@@ -221,7 +231,7 @@ async def add_tenant(
     name: str = Form(...),
     room_number: str = Form(...),
     phone: str = Form(""),
-    monthly_rent: float = Form(0.0),
+    monthly_rent: Optional[str] = Form("0"),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
     joining_date: Optional[str] = Form(None),
@@ -247,7 +257,7 @@ async def add_tenant(
         name=name.strip(),
         room_number=room_number.strip(),
         phone=phone.strip(),
-        monthly_rent=monthly_rent,
+        monthly_rent=safe_float(monthly_rent, 0.0),
         id_type=id_type,
         id_number=id_number.strip(),
         joining_date=parsed_date,
@@ -265,7 +275,7 @@ async def edit_tenant(
     name: str = Form(...),
     room_number: str = Form(...),
     phone: str = Form(""),
-    monthly_rent: float = Form(0.0),
+    monthly_rent: Optional[str] = Form("0"),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
     photo: Optional[UploadFile] = File(None),
@@ -282,7 +292,7 @@ async def edit_tenant(
         tenant.name = name.strip()
         tenant.room_number = room_number.strip()
         tenant.phone = phone.strip()
-        tenant.monthly_rent = monthly_rent
+        tenant.monthly_rent = safe_float(monthly_rent, 0.0)
         tenant.id_type = id_type
         tenant.id_number = id_number.strip()
         
@@ -317,7 +327,7 @@ async def add_family_member(
     member_name: str = Form(...),
     relation: str = Form(...),
     phone: str = Form(""),
-    age: Optional[int] = Form(None),
+    age: Optional[str] = Form(None),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
     photo: Optional[UploadFile] = File(None),
@@ -331,12 +341,16 @@ async def add_family_member(
     photo_path = await save_uploaded_file(photo, "photos")
     doc_path = await save_uploaded_file(id_doc, "documents")
 
+    parsed_age = None
+    if age and age.strip().isdigit():
+        parsed_age = int(age.strip())
+
     member = FamilyMember(
         tenant_id=tenant_id,
         name=member_name.strip(),
         relation=relation.strip(),
         phone=phone.strip(),
-        age=age,
+        age=parsed_age,
         id_type=id_type,
         id_number=id_number.strip(),
         photo_path=photo_path,
@@ -353,7 +367,7 @@ async def edit_family_member(
     member_name: str = Form(...),
     relation: str = Form(...),
     phone: str = Form(""),
-    age: Optional[int] = Form(None),
+    age: Optional[str] = Form(None),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
     photo: Optional[UploadFile] = File(None),
@@ -370,7 +384,8 @@ async def edit_family_member(
         member.name = member_name.strip()
         member.relation = relation.strip()
         member.phone = phone.strip()
-        member.age = age
+        if age and age.strip().isdigit():
+            member.age = int(age.strip())
         member.id_type = id_type
         member.id_number = id_number.strip()
         
@@ -397,30 +412,35 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- PAYMENT CRUD ---
+# --- SAFE PAYMENT CRUD (Zero Exception on empty fields) ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
     tenant_id: int = Form(...),
-    fixed_rent: float = Form(0.0),
-    water_bill: float = Form(0.0),
-    electricity_bill: float = Form(0.0),
-    other_charges: float = Form(0.0),
-    elec_prev_reading: float = Form(0.0),
-    elec_curr_reading: float = Form(0.0),
-    water_prev_reading: float = Form(0.0),
-    water_curr_reading: float = Form(0.0),
+    fixed_rent: Optional[str] = Form("0"),
+    water_bill: Optional[str] = Form("0"),
+    electricity_bill: Optional[str] = Form("0"),
+    other_charges: Optional[str] = Form("0"),
+    elec_prev_reading: Optional[str] = Form("0"),
+    elec_curr_reading: Optional[str] = Form("0"),
+    water_prev_reading: Optional[str] = Form("0"),
+    water_curr_reading: Optional[str] = Form("0"),
     for_month: str = Form(...),
     payment_date: Optional[str] = Form(None),
     payment_mode: str = Form("UPI"),
-    notes: str = Form(""),
+    notes: Optional[str] = Form(""),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    total_amount = float(fixed_rent) + float(water_bill) + float(electricity_bill) + float(other_charges)
+    f_rent = safe_float(fixed_rent, 0.0)
+    w_bill = safe_float(water_bill, 0.0)
+    e_bill = safe_float(electricity_bill, 0.0)
+    o_charges = safe_float(other_charges, 0.0)
+    total_amount = f_rent + w_bill + e_bill + o_charges
+
     pay_dt = date.today()
     if payment_date and payment_date.strip():
         try:
@@ -430,19 +450,19 @@ async def record_payment(
 
     payment = RentPayment(
         tenant_id=tenant_id,
-        fixed_rent=fixed_rent,
-        water_bill=water_bill,
-        electricity_bill=electricity_bill,
-        other_charges=other_charges,
+        fixed_rent=f_rent,
+        water_bill=w_bill,
+        electricity_bill=e_bill,
+        other_charges=o_charges,
         total_paid=total_amount,
-        elec_prev_reading=elec_prev_reading,
-        elec_curr_reading=elec_curr_reading,
-        water_prev_reading=water_prev_reading,
-        water_curr_reading=water_curr_reading,
+        elec_prev_reading=safe_float(elec_prev_reading, 0.0),
+        elec_curr_reading=safe_float(elec_curr_reading, 0.0),
+        water_prev_reading=safe_float(water_prev_reading, 0.0),
+        water_curr_reading=safe_float(water_curr_reading, 0.0),
         for_month=for_month.strip(),
         payment_date=pay_dt,
-        payment_mode=payment_mode.strip(),
-        notes=notes.strip()
+        payment_mode=payment_mode.strip() if payment_mode else "UPI",
+        notes=notes.strip() if notes else ""
     )
     db.add(payment)
     await db.commit()
@@ -452,18 +472,18 @@ async def record_payment(
 async def edit_payment(
     payment_id: int,
     request: Request,
-    fixed_rent: float = Form(0.0),
-    water_bill: float = Form(0.0),
-    electricity_bill: float = Form(0.0),
-    other_charges: float = Form(0.0),
-    elec_prev_reading: float = Form(0.0),
-    elec_curr_reading: float = Form(0.0),
-    water_prev_reading: float = Form(0.0),
-    water_curr_reading: float = Form(0.0),
+    fixed_rent: Optional[str] = Form("0"),
+    water_bill: Optional[str] = Form("0"),
+    electricity_bill: Optional[str] = Form("0"),
+    other_charges: Optional[str] = Form("0"),
+    elec_prev_reading: Optional[str] = Form("0"),
+    elec_curr_reading: Optional[str] = Form("0"),
+    water_prev_reading: Optional[str] = Form("0"),
+    water_curr_reading: Optional[str] = Form("0"),
     for_month: str = Form(...),
     payment_date: Optional[str] = Form(None),
     payment_mode: str = Form("UPI"),
-    notes: str = Form(""),
+    notes: Optional[str] = Form(""),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
@@ -473,23 +493,28 @@ async def edit_payment(
     result = await db.execute(select(RentPayment).where(RentPayment.id == payment_id))
     payment = result.scalar_one_or_none()
     if payment:
-        payment.fixed_rent = fixed_rent
-        payment.water_bill = water_bill
-        payment.electricity_bill = electricity_bill
-        payment.other_charges = other_charges
-        payment.total_paid = float(fixed_rent) + float(water_bill) + float(electricity_bill) + float(other_charges)
-        payment.elec_prev_reading = elec_prev_reading
-        payment.elec_curr_reading = elec_curr_reading
-        payment.water_prev_reading = water_prev_reading
-        payment.water_curr_reading = water_curr_reading
+        f_rent = safe_float(fixed_rent, 0.0)
+        w_bill = safe_float(water_bill, 0.0)
+        e_bill = safe_float(electricity_bill, 0.0)
+        o_charges = safe_float(other_charges, 0.0)
+        
+        payment.fixed_rent = f_rent
+        payment.water_bill = w_bill
+        payment.electricity_bill = e_bill
+        payment.other_charges = o_charges
+        payment.total_paid = f_rent + w_bill + e_bill + o_charges
+        payment.elec_prev_reading = safe_float(elec_prev_reading, 0.0)
+        payment.elec_curr_reading = safe_float(elec_curr_reading, 0.0)
+        payment.water_prev_reading = safe_float(water_prev_reading, 0.0)
+        payment.water_curr_reading = safe_float(water_curr_reading, 0.0)
         payment.for_month = for_month.strip()
         if payment_date and payment_date.strip():
             try:
                 payment.payment_date = datetime.strptime(payment_date.strip(), "%Y-%m-%d").date()
             except Exception:
                 pass
-        payment.payment_mode = payment_mode.strip()
-        payment.notes = notes.strip()
+        payment.payment_mode = payment_mode.strip() if payment_mode else "UPI"
+        payment.notes = notes.strip() if notes else ""
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
