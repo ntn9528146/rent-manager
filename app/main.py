@@ -14,7 +14,8 @@ from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
 from jose import JWTError, jwt
 
-from app.database import async_session, init_db, User, Tenant, FamilyMember, RentPayment
+from app.database import async_session, init_db, User, Tenant, FamilyMember, RentPayment, PoliceVerification
+from app.routes.police import router as police_router
 
 SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_rent_manager_key_2026")
 ALGORITHM = "HS256"
@@ -23,9 +24,14 @@ COOKIE_NAME = "rent_access_token"
 app = FastAPI(title="Rent Manager Pro")
 templates = Jinja2Templates(directory="app/templates")
 
+# Upload Directories
 os.makedirs("uploads/photos", exist_ok=True)
 os.makedirs("uploads/documents", exist_ok=True)
+os.makedirs("uploads/police_docs", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Include Dedicated Police Module Router
+app.include_router(police_router)
 
 @app.on_event("startup")
 async def on_startup():
@@ -141,7 +147,10 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     result_tenants = await db.execute(
-        select(Tenant).options(selectinload(Tenant.members)).where(Tenant.is_active == 1).order_by(Tenant.room_number)
+        select(Tenant)
+        .options(selectinload(Tenant.members), selectinload(Tenant.verifications))
+        .where(Tenant.is_active == 1)
+        .order_by(Tenant.room_number)
     )
     tenants = result_tenants.scalars().all()
 
@@ -186,7 +195,6 @@ async def add_tenant(
 
     photo_path = await save_uploaded_file(photo, "photos")
     doc_path = await save_uploaded_file(id_doc, "documents")
-
     parsed_date = datetime.strptime(joining_date, "%Y-%m-%d").date() if joining_date else date.today()
 
     tenant = Tenant(
@@ -343,7 +351,7 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- PAYMENT RECORD CRUD WITH METER READINGS ---
+# --- PAYMENT CRUD ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
@@ -356,7 +364,7 @@ async def record_payment(
     elec_curr_reading: float = Form(0.0),
     water_prev_reading: float = Form(0.0),
     water_curr_reading: float = Form(0.0),
-    for_month: str = Form(...), # format: YYYY-MM
+    for_month: str = Form(...),
     payment_date: str = Form(None),
     payment_mode: str = Form("UPI"),
     notes: str = Form(""),

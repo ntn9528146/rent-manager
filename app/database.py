@@ -42,6 +42,7 @@ class Tenant(Base):
 
     members: Mapped[list["FamilyMember"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     payments: Mapped[list["RentPayment"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    verifications: Mapped[list["PoliceVerification"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 
 class FamilyMember(Base):
     __tablename__ = "family_members"
@@ -59,27 +60,39 @@ class FamilyMember(Base):
 
     tenant: Mapped["Tenant"] = relationship(back_populates="members")
 
+class PoliceVerification(Base):
+    __tablename__ = "police_verifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    police_station: Mapped[str] = mapped_column(String(100), nullable=False)
+    verification_ref_no: Mapped[str] = mapped_column(String(100), nullable=True)
+    submission_date: Mapped[date] = mapped_column(Date, default=date.today)
+    status: Mapped[str] = mapped_column(String(50), default="Submitted") # Submitted / In Progress / Verified
+    document_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    remarks: Mapped[str] = mapped_column(Text, nullable=True)
+
+    tenant: Mapped["Tenant"] = relationship(back_populates="verifications")
+
 class RentPayment(Base):
     __tablename__ = "rent_payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
     
-    # Financial breakdown
     fixed_rent: Mapped[float] = mapped_column(Float, default=0.0)
     water_bill: Mapped[float] = mapped_column(Float, default=0.0)
     electricity_bill: Mapped[float] = mapped_column(Float, default=0.0)
     other_charges: Mapped[float] = mapped_column(Float, default=0.0)
     total_paid: Mapped[float] = mapped_column(Float, default=0.0)
 
-    # Meter readings
     elec_prev_reading: Mapped[float] = mapped_column(Float, default=0.0)
     elec_curr_reading: Mapped[float] = mapped_column(Float, default=0.0)
     water_prev_reading: Mapped[float] = mapped_column(Float, default=0.0)
     water_curr_reading: Mapped[float] = mapped_column(Float, default=0.0)
 
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
-    for_month: Mapped[str] = mapped_column(String(20), nullable=False) # e.g. "2024-05"
+    for_month: Mapped[str] = mapped_column(String(20), nullable=False)
     payment_mode: Mapped[str] = mapped_column(String(50), default="UPI")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
