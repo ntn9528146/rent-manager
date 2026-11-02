@@ -32,8 +32,7 @@ class Tenant(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     monthly_rent: Mapped[float] = mapped_column(Float, default=0.0)
     
-    # ID Details & Photo
-    id_type: Mapped[str] = mapped_column(String(50), default="Aadhar Card") # Aadhar Card / Voter ID / PAN
+    id_type: Mapped[str] = mapped_column(String(50), default="Aadhar Card")
     id_number: Mapped[str] = mapped_column(String(50), nullable=True)
     id_document_path: Mapped[str] = mapped_column(String(255), nullable=True)
     photo_path: Mapped[str] = mapped_column(String(255), nullable=True)
@@ -50,8 +49,12 @@ class FamilyMember(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    relation: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. Wife, Son, Mother
+    relation: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=True)
+    id_type: Mapped[str] = mapped_column(String(50), default="Aadhar Card")
+    id_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    id_document_path: Mapped[str] = mapped_column(String(255), nullable=True)
     photo_path: Mapped[str] = mapped_column(String(255), nullable=True)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="members")
@@ -62,15 +65,21 @@ class RentPayment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
     
-    # 4 distinct rent columns
+    # Financial breakdown
     fixed_rent: Mapped[float] = mapped_column(Float, default=0.0)
     water_bill: Mapped[float] = mapped_column(Float, default=0.0)
     electricity_bill: Mapped[float] = mapped_column(Float, default=0.0)
     other_charges: Mapped[float] = mapped_column(Float, default=0.0)
     total_paid: Mapped[float] = mapped_column(Float, default=0.0)
 
+    # Meter readings
+    elec_prev_reading: Mapped[float] = mapped_column(Float, default=0.0)
+    elec_curr_reading: Mapped[float] = mapped_column(Float, default=0.0)
+    water_prev_reading: Mapped[float] = mapped_column(Float, default=0.0)
+    water_curr_reading: Mapped[float] = mapped_column(Float, default=0.0)
+
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
-    for_month: Mapped[str] = mapped_column(String(20), nullable=False)
+    for_month: Mapped[str] = mapped_column(String(20), nullable=False) # e.g. "2024-05"
     payment_mode: Mapped[str] = mapped_column(String(50), default="UPI")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 

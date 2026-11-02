@@ -3,20 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rent Management Portal</title>
+    <title>Rent & Meter Manager Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal { transition: opacity 0.2s ease, visibility 0.2s; }
+        .modal.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 py-6">
-        <!-- Top Navigation -->
+        <!-- Header -->
         <header class="flex items-center justify-between pb-6 border-b border-slate-800 mb-8">
             <div>
-                <h1 class="text-2xl font-black text-indigo-400">Rent Manager Pro</h1>
-                <p class="text-xs text-slate-400">Welcome, {{ user.full_name or user.username }}</p>
+                <h1 class="text-2xl font-black text-indigo-400">Rent & Utility Manager</h1>
+                <p class="text-xs text-slate-400">Owner: {{ user.full_name or user.username }}</p>
             </div>
             <div class="flex items-center gap-4">
                 <span class="bg-indigo-950 border border-indigo-700/50 px-3 py-1.5 rounded-lg text-indigo-300 font-semibold text-xs">
-                    Current: {{ current_month }}
+                    📅 System Active (All Years Supported)
                 </span>
                 <a href="/logout" class="bg-rose-900/40 hover:bg-rose-800/60 text-rose-300 border border-rose-700/50 text-xs px-3 py-1.5 rounded-lg transition-all">
                     Logout
@@ -25,96 +29,131 @@
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Left Panel: Forms (5 cols) -->
+            <!-- Left Forms Column (5 cols) -->
             <div class="lg:col-span-5 space-y-6">
-                <!-- Record Rent & 4 Components -->
+                <!-- Record Rent & Meter Readings Form -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                        <span>💰</span> Record Monthly Rent & Bills
+                        <span>⚡</span> Record Rent & Meter Readings
                     </h2>
-                    <form action="/payments/record" method="POST" class="space-y-3">
+                    <form action="/payments/record" method="POST" class="space-y-4">
                         <div>
-                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Tenant / Room</label>
+                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Tenant</label>
                             <select name="tenant_id" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
                                 {% for t in tenants %}
                                 <option value="{{ t.id }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <!-- Calendar Pickers for Year & Month -->
+                        <div class="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                            <div>
+                                <label class="block text-xs uppercase text-amber-400 font-bold mb-1">Rent Month/Year 📅</label>
+                                <input type="month" name="for_month" value="{{ current_month_picker }}" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase text-amber-400 font-bold mb-1">Payment Date 📅</label>
+                                <input type="date" name="payment_date" value="{{ today_date }}" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs">
+                            </div>
+                        </div>
+
+                        <!-- 4 Financial Columns -->
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">1. Fixed Rent (₹)</label>
-                                <input type="number" step="0.01" name="fixed_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="number" step="0.01" name="fixed_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">2. Water Bill (₹)</label>
-                                <input type="number" step="0.01" name="water_bill" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="number" step="0.01" name="water_bill" value="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">3. Electricity Bill (₹)</label>
-                                <input type="number" step="0.01" name="electricity_bill" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="number" step="0.01" name="electricity_bill" value="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">4. Other Charges (₹)</label>
-                                <input type="number" step="0.01" name="other_charges" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="number" step="0.01" name="other_charges" value="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                         </div>
+
+                        <!-- Meter Readings Section -->
+                        <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-3">
+                            <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">Meter Readings Tracking</span>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <label class="text-slate-400">Elec Prev Reading</label>
+                                    <input type="number" step="0.1" name="elec_prev_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                </div>
+                                <div>
+                                    <label class="text-slate-400">Elec Current Reading</label>
+                                    <input type="number" step="0.1" name="elec_curr_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <label class="text-slate-400">Water Prev Reading</label>
+                                    <input type="number" step="0.1" name="water_prev_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                </div>
+                                <div>
+                                    <label class="text-slate-400">Water Current Reading</label>
+                                    <input type="number" step="0.1" name="water_curr_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">For Month</label>
-                                <input type="text" name="for_month" value="{{ current_month }}" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
-                            </div>
-                            <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Payment Mode</label>
-                                <select name="payment_mode" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <select name="payment_mode" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
                                     <option value="UPI">UPI / GPay / PhonePe</option>
                                     <option value="Cash">Cash</option>
                                     <option value="NetBanking">NetBanking / Transfer</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Notes / Remarks</label>
+                                <input type="text" name="notes" placeholder="Optional notes" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Notes</label>
-                            <input type="text" name="notes" placeholder="e.g. meter reading / remarks" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
-                        </div>
+
                         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/30">
-                            Save Payment
+                            Save Payment Record
                         </button>
                     </form>
                 </div>
 
-                <!-- Add Kirayedar with Photo & ID -->
+                <!-- Add Kirayedar Form -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
-                        <span>👤</span> Add Kirayedar (ID & Photo)
+                        <span>👤</span> Add Kirayedar
                     </h2>
                     <form action="/tenants/add" method="POST" enctype="multipart/form-data" class="space-y-3">
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Name</label>
-                                <input type="text" name="name" required placeholder="Full Name" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="text" name="name" required placeholder="Full Name" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Room No</label>
-                                <input type="text" name="room_number" required placeholder="Room 101" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="text" name="room_number" required placeholder="Room 101" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Phone</label>
-                                <input type="text" name="phone" placeholder="9876543210" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="text" name="phone" placeholder="9876543210" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Fixed Rent (₹)</label>
-                                <input type="number" step="0.01" name="monthly_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="number" step="0.01" name="monthly_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Type</label>
-                                <select name="id_type" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <select name="id_type" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
                                     <option value="Aadhar Card">Aadhar Card</option>
                                     <option value="Voter ID">Voter ID</option>
                                     <option value="Driving License">Driving License</option>
@@ -123,17 +162,21 @@
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Number</label>
-                                <input type="text" name="id_number" placeholder="XXXX-XXXX-XXXX" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white">
+                                <input type="text" name="id_number" placeholder="XXXX-XXXX-XXXX" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Joining Date 📅</label>
+                            <input type="date" name="joining_date" value="{{ today_date }}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Tenant Photo</label>
-                                <input type="file" name="photo" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded-lg p-1.5">
+                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Photo</label>
+                                <input type="file" name="photo" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Document</label>
-                                <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded-lg p-1.5">
+                                <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
                             </div>
                         </div>
                         <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-900/30">
@@ -143,9 +186,9 @@
                 </div>
             </div>
 
-            <!-- Right Panel: Kirayedar Cards & Family + Payment Table (7 cols) -->
+            <!-- Right Profiles & Payments Column (7 cols) -->
             <div class="lg:col-span-7 space-y-6">
-                <!-- Tenants with Family Details -->
+                <!-- Profiles with Family Members & Edit/Delete Buttons -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-xl font-bold mb-4 flex items-center justify-between">
                         <span>Kirayedar Profiles & Family Members</span>
@@ -170,51 +213,165 @@
                                         <p class="text-xs text-slate-400 mt-0.5">
                                             🪪 {{ t.id_type }}: <span class="text-slate-300">{{ t.id_number or 'Not added' }}</span>
                                             {% if t.id_document_path %}
-                                            | <a href="{{ t.id_document_path }}" target="_blank" class="text-indigo-400 underline hover:text-indigo-300">View Document</a>
+                                            | <a href="{{ t.id_document_path }}" target="_blank" class="text-indigo-400 underline hover:text-indigo-300">View ID</a>
                                             {% endif %}
                                         </p>
                                     </div>
                                 </div>
+                                <!-- Tenant Edit & Delete Action Buttons -->
+                                <div class="flex items-center gap-2">
+                                    <button onclick="openModal('edit-tenant-modal-{{ t.id }}')" class="text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded">
+                                        Edit
+                                    </button>
+                                    <a href="/tenants/{{ t.id }}/delete" onclick="return confirm('Kya aap sach me is Kirayedar aur unki sari history ko delete karna chahte hain?')" class="text-xs bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded">
+                                        Delete
+                                    </a>
+                                </div>
                             </div>
 
-                            <!-- Family Members List -->
+                            <!-- Family Members Section -->
                             <div class="mt-4 pt-3 border-t border-slate-800">
                                 <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Family Members ({{ t.members|length }}):</div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                                <div class="grid grid-cols-1 gap-2 mb-3">
                                     {% for m in t.members %}
-                                    <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg text-xs">
-                                        {% if m.photo_path %}
-                                        <img src="{{ m.photo_path }}" class="w-7 h-7 rounded-full object-cover border border-slate-600">
-                                        {% else %}
-                                        <span class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-semibold text-slate-300">{{ m.name[:1] }}</span>
-                                        {% endif %}
-                                        <div>
-                                            <p class="font-semibold text-slate-200">{{ m.name }}</p>
-                                            <p class="text-[10px] text-slate-400">{{ m.relation }} {% if m.age %}({{ m.age }} yrs){% endif %}</p>
+                                    <div class="flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg text-xs">
+                                        <div class="flex items-center gap-2.5">
+                                            {% if m.photo_path %}
+                                            <img src="{{ m.photo_path }}" class="w-8 h-8 rounded-full object-cover border border-slate-600">
+                                            {% else %}
+                                            <span class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-semibold text-slate-300">{{ m.name[:1] }}</span>
+                                            {% endif %}
+                                            <div>
+                                                <p class="font-semibold text-slate-200">{{ m.name }} <span class="text-slate-400 font-normal">({{ m.relation }}{% if m.age %}, {{ m.age }}y{% endif %})</span></p>
+                                                <p class="text-[10px] text-slate-400">
+                                                    📞 {{ m.phone or 'No phone' }} | 🪪 {{ m.id_type }}: {{ m.id_number or '-' }}
+                                                    {% if m.id_document_path %}
+                                                    | <a href="{{ m.id_document_path }}" target="_blank" class="text-indigo-400 underline">ID Doc</a>
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <button onclick="openModal('edit-member-modal-{{ m.id }}')" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Edit</button>
+                                            <a href="/members/{{ m.id }}/delete" onclick="return confirm('Family member delete karein?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Delete</a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Member Edit Modal -->
+                                    <div id="edit-member-modal-{{ m.id }}" class="modal hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                                        <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full space-y-3">
+                                            <h3 class="font-bold text-sm text-indigo-400">Edit Family Member - {{ m.name }}</h3>
+                                            <form action="/members/{{ m.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-2 text-xs">
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <input type="text" name="member_name" value="{{ m.name }}" required placeholder="Name" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                    <input type="text" name="relation" value="{{ m.relation }}" required placeholder="Relation" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <input type="text" name="phone" value="{{ m.phone or '' }}" placeholder="Contact Phone" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                    <input type="number" name="age" value="{{ m.age or '' }}" placeholder="Age" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <select name="id_type" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                        <option value="Aadhar Card" {% if m.id_type == 'Aadhar Card' %}selected{% endif %}>Aadhar Card</option>
+                                                        <option value="Voter ID" {% if m.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
+                                                        <option value="PAN Card" {% if m.id_type == 'PAN Card' %}selected{% endif %}>PAN Card</option>
+                                                    </select>
+                                                    <input type="text" name="id_number" value="{{ m.id_number or '' }}" placeholder="ID Number" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label class="text-[10px] text-slate-400">New Photo (Optional)</label>
+                                                        <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-[10px] text-slate-400">New ID Doc (Optional)</label>
+                                                        <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
+                                                    </div>
+                                                </div>
+                                                <div class="flex justify-end gap-2 pt-2">
+                                                    <button type="button" onclick="closeModal('edit-member-modal-{{ m.id }}')" class="bg-slate-700 px-3 py-1 rounded text-white">Cancel</button>
+                                                    <button type="submit" class="bg-indigo-600 px-3 py-1 rounded text-white font-bold">Update</button>
+                                                </div>
+                                            </form>
                                         </div>
                                     </div>
                                     {% else %}
-                                    <p class="text-xs text-slate-500 italic col-span-2">Koi family member add nahi hai.</p>
+                                    <p class="text-xs text-slate-500 italic">Koi family member add nahi hai.</p>
                                     {% endfor %}
                                 </div>
 
-                                <!-- Add Member Inline Form -->
+                                <!-- Add Family Member Inline Form with Contact & ID Details -->
                                 <details class="group">
                                     <summary class="cursor-pointer text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-                                        <span>+ Add Family Member</span>
+                                        <span>+ Add Family Member (with ID & Phone)</span>
                                     </summary>
-                                    <form action="/tenants/{{ t.id }}/members/add" method="POST" enctype="multipart/form-data" class="mt-2 bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2">
+                                    <form action="/tenants/{{ t.id }}/members/add" method="POST" enctype="multipart/form-data" class="mt-2 bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2 text-xs">
                                         <div class="grid grid-cols-3 gap-2">
-                                            <input type="text" name="member_name" required placeholder="Member Name" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-white">
-                                            <input type="text" name="relation" required placeholder="Relation (Wife/Son)" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-white">
-                                            <input type="number" name="age" placeholder="Age" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-white">
+                                            <input type="text" name="member_name" required placeholder="Name" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
+                                            <input type="text" name="relation" required placeholder="Relation (Wife/Son)" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
+                                            <input type="number" name="age" placeholder="Age" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
-                                        <div class="flex items-center gap-2">
-                                            <input type="file" name="photo" accept="image/*" class="text-xs text-slate-400 w-full">
-                                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-xs font-bold px-3 py-1.5 rounded text-white whitespace-nowrap">Save Member</button>
+                                        <div class="grid grid-cols-3 gap-2">
+                                            <input type="text" name="phone" placeholder="Phone Number" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
+                                            <select name="id_type" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
+                                                <option value="Aadhar Card">Aadhar Card</option>
+                                                <option value="Voter ID">Voter ID</option>
+                                                <option value="PAN Card">PAN Card</option>
+                                            </select>
+                                            <input type="text" name="id_number" placeholder="ID Number" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="text-[10px] text-slate-400">Photo</label>
+                                                <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] text-slate-400">ID Document</label>
+                                                <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 font-bold px-3 py-1.5 rounded text-white">Save Member Profile</button>
                                     </form>
                                 </details>
+                            </div>
+                        </div>
+
+                        <!-- Tenant Edit Modal -->
+                        <div id="edit-tenant-modal-{{ t.id }}" class="modal hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                            <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full space-y-3">
+                                <h3 class="font-bold text-sm text-indigo-400">Edit Kirayedar - {{ t.name }}</h3>
+                                <form action="/tenants/{{ t.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-2 text-xs">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="text" name="name" value="{{ t.name }}" required placeholder="Name" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                        <input type="text" name="room_number" value="{{ t.room_number }}" required placeholder="Room" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="text" name="phone" value="{{ t.phone or '' }}" placeholder="Phone" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                        <input type="number" step="0.01" name="monthly_rent" value="{{ t.monthly_rent }}" required placeholder="Rent" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <select name="id_type" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                            <option value="Aadhar Card" {% if t.id_type == 'Aadhar Card' %}selected{% endif %}>Aadhar Card</option>
+                                            <option value="Voter ID" {% if t.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
+                                            <option value="PAN Card" {% if t.id_type == 'PAN Card' %}selected{% endif %}>PAN Card</option>
+                                        </select>
+                                        <input type="text" name="id_number" value="{{ t.id_number or '' }}" placeholder="ID Number" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="text-[10px] text-slate-400">New Photo (Optional)</label>
+                                            <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] text-slate-400">New ID Doc (Optional)</label>
+                                            <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" onclick="closeModal('edit-tenant-modal-{{ t.id }}')" class="bg-slate-700 px-3 py-1 rounded text-white">Cancel</button>
+                                        <button type="submit" class="bg-indigo-600 px-3 py-1 rounded text-white font-bold">Save Changes</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                         {% else %}
@@ -223,20 +380,21 @@
                     </div>
                 </div>
 
-                <!-- Monthly Payment History with 4 Breakdown Columns -->
+                <!-- Payment Receipts & Meter Readings Table with Edit/Delete -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                    <h2 class="text-xl font-bold mb-4">Payment Receipts & Breakdown</h2>
+                    <h2 class="text-xl font-bold mb-4">Payment & Meter Reading Records</h2>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs">
                             <thead class="uppercase bg-slate-950 text-slate-400 border-b border-slate-800">
                                 <tr>
                                     <th class="py-2.5 px-3">Room / Kirayedar</th>
-                                    <th class="py-2.5 px-3">Month</th>
+                                    <th class="py-2.5 px-2">Month</th>
                                     <th class="py-2.5 px-2 text-right">Fixed</th>
                                     <th class="py-2.5 px-2 text-right">Water</th>
                                     <th class="py-2.5 px-2 text-right">Electricity</th>
                                     <th class="py-2.5 px-2 text-right">Other</th>
-                                    <th class="py-2.5 px-3 text-right text-emerald-400 font-bold">Total</th>
+                                    <th class="py-2.5 px-2 text-right text-emerald-400 font-bold">Total</th>
+                                    <th class="py-2.5 px-2 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800">
@@ -244,18 +402,76 @@
                                 <tr class="hover:bg-slate-800/40 transition">
                                     <td class="py-2.5 px-3 font-semibold text-slate-200">
                                         {{ p.tenant.room_number }} - {{ p.tenant.name }}
-                                        <div class="text-[10px] text-slate-400 font-normal">{{ p.payment_mode }} ({{ p.payment_date }})</div>
+                                        <div class="text-[10px] text-slate-400 font-normal">{{ p.payment_mode }} (Date: {{ p.payment_date }})</div>
+                                        <!-- Meter Readings Badges -->
+                                        <div class="flex gap-2 mt-1 text-[10px]">
+                                            <span class="bg-amber-950 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/40">
+                                                ⚡ Elec: {{ p.elec_prev_reading }} ➔ {{ p.elec_curr_reading }} ({{ (p.elec_curr_reading - p.elec_prev_reading)|round(1) }} u)
+                                            </span>
+                                            <span class="bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800/40">
+                                                💧 Water: {{ p.water_prev_reading }} ➔ {{ p.water_curr_reading }}
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td class="py-2.5 px-3 text-indigo-300 font-semibold">{{ p.for_month }}</td>
+                                    <td class="py-2.5 px-2 text-indigo-300 font-semibold">{{ p.for_month }}</td>
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.fixed_rent }}</td>
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.water_bill }}</td>
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.electricity_bill }}</td>
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.other_charges }}</td>
-                                    <td class="py-2.5 px-3 text-right font-bold text-emerald-400">₹{{ p.total_paid }}</td>
+                                    <td class="py-2.5 px-2 text-right font-bold text-emerald-400">₹{{ p.total_paid }}</td>
+                                    <td class="py-2.5 px-2 text-center">
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <button onclick="openModal('edit-pay-modal-{{ p.id }}')" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Edit</button>
+                                            <a href="/payments/{{ p.id }}/delete" onclick="return confirm('Kya aap is payment record ko delete karna chahte hain?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Del</a>
+                                        </div>
+                                    </td>
                                 </tr>
+
+                                <!-- Payment Edit Modal -->
+                                <div id="edit-pay-modal-{{ p.id }}" class="modal hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                                    <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full space-y-3">
+                                        <h3 class="font-bold text-sm text-indigo-400">Edit Payment ({{ p.tenant.name }} - {{ p.for_month }})</h3>
+                                        <form action="/payments/{{ p.id }}/edit" method="POST" class="space-y-2 text-xs">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="text-[10px] text-slate-400">For Month 📅</label>
+                                                    <input type="month" name="for_month" value="{{ p.for_month }}" required class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] text-slate-400">Payment Date 📅</label>
+                                                    <input type="date" name="payment_date" value="{{ p.payment_date }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <input type="number" step="0.01" name="fixed_rent" value="{{ p.fixed_rent }}" placeholder="Fixed Rent" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.01" name="water_bill" value="{{ p.water_bill }}" placeholder="Water Bill" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.01" name="electricity_bill" value="{{ p.electricity_bill }}" placeholder="Electricity Bill" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.01" name="other_charges" value="{{ p.other_charges }}" placeholder="Other" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <input type="number" step="0.1" name="elec_prev_reading" value="{{ p.elec_prev_reading }}" placeholder="Elec Prev" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.1" name="elec_curr_reading" value="{{ p.elec_curr_reading }}" placeholder="Elec Curr" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.1" name="water_prev_reading" value="{{ p.water_prev_reading }}" placeholder="Water Prev" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                <input type="number" step="0.1" name="water_curr_reading" value="{{ p.water_curr_reading }}" placeholder="Water Curr" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <select name="payment_mode" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                                    <option value="UPI" {% if p.payment_mode == 'UPI' %}selected{% endif %}>UPI</option>
+                                                    <option value="Cash" {% if p.payment_mode == 'Cash' %}selected{% endif %}>Cash</option>
+                                                    <option value="NetBanking" {% if p.payment_mode == 'NetBanking' %}selected{% endif %}>NetBanking</option>
+                                                </select>
+                                                <input type="text" name="notes" value="{{ p.notes or '' }}" placeholder="Notes" class="bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                                            </div>
+                                            <div class="flex justify-end gap-2 pt-2">
+                                                <button type="button" onclick="closeModal('edit-pay-modal-{{ p.id }}')" class="bg-slate-700 px-3 py-1 rounded text-white">Cancel</button>
+                                                <button type="submit" class="bg-emerald-600 px-3 py-1 rounded text-white font-bold">Update Record</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                                 {% else %}
                                 <tr>
-                                    <td colspan="7" class="text-center py-6 text-slate-500">Abhi tak koi receipt entry nahi hui hai.</td>
+                                    <td colspan="8" class="text-center py-6 text-slate-500">Abhi tak koi receipt entry nahi hui hai.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -265,5 +481,17 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal Helper Script -->
+    <script>
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if(modal) modal.classList.remove('hidden');
+        }
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if(modal) modal.classList.add('hidden');
+        }
+    </script>
 </body>
 </html>

@@ -22,11 +22,17 @@
         <form action="/login" method="POST" class="space-y-4">
             <div>
                 <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Username</label>
-                <input type="text" name="username" required autofocus class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+                <input type="text" name="username" required autofocus autocomplete="username" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
             </div>
             <div>
                 <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Password</label>
-                <input type="password" name="password" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+                <input type="password" name="password" required autocomplete="current-password" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div class="flex items-center justify-between py-1">
+                <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300 select-none">
+                    <input type="checkbox" name="remember_me" value="true" checked class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0 cursor-pointer">
+                    <span>Save details / Remember Me</span>
+                </label>
             </div>
             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-900/40">
                 Log In
