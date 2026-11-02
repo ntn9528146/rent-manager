@@ -10,11 +10,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, text
 from sqlalchemy.orm import selectinload
 from jose import JWTError, jwt
 
-from app.database import async_session, init_db, User, Tenant, FamilyMember, RentPayment, PoliceVerification
+from app.database import async_session, init_db, engine, User, Tenant, FamilyMember, RentPayment, PoliceVerification
 from app.routes.police import router as police_router
 
 SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_rent_manager_key_2026")
@@ -34,6 +34,18 @@ app.include_router(police_router)
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    # Auto fix postgres sequence after migrations
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                SELECT setval(pg_get_serial_sequence('tenants', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM tenants;
+                SELECT setval(pg_get_serial_sequence('family_members', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM family_members;
+                SELECT setval(pg_get_serial_sequence('rent_payments', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM rent_payments;
+                SELECT setval(pg_get_serial_sequence('police_verifications', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM police_verifications;
+                SELECT setval(pg_get_serial_sequence('users', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM users;
+            """))
+    except Exception as e:
+        print(f"Sequence sync note: {e}")
 
 async def get_db():
     async with async_session() as session:
@@ -69,8 +81,8 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
     result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
-async def save_uploaded_file(file: UploadFile, subfolder: str) -> Optional[str]:
-    if not file or not file.filename:
+async def save_uploaded_file(file: Optional[UploadFile], subfolder: str) -> Optional[str]:
+    if not file or not getattr(file, "filename", None) or file.filename.strip() == "":
         return None
     ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4().hex}{ext}"
@@ -167,7 +179,7 @@ async def logout():
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# --- DASHBOARD & CRUD ---
+# --- MAIN DASHBOARD ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_current_user(request, db)
@@ -212,9 +224,9 @@ async def add_tenant(
     monthly_rent: float = Form(0.0),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
-    joining_date: str = Form(None),
-    photo: UploadFile = File(None),
-    id_doc: UploadFile = File(None),
+    joining_date: Optional[str] = Form(None),
+    photo: Optional[UploadFile] = File(None),
+    id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
@@ -223,7 +235,13 @@ async def add_tenant(
 
     photo_path = await save_uploaded_file(photo, "photos")
     doc_path = await save_uploaded_file(id_doc, "documents")
-    parsed_date = datetime.strptime(joining_date, "%Y-%m-%d").date() if joining_date else date.today()
+    
+    parsed_date = date.today()
+    if joining_date and joining_date.strip():
+        try:
+            parsed_date = datetime.strptime(joining_date.strip(), "%Y-%m-%d").date()
+        except Exception:
+            parsed_date = date.today()
 
     tenant = Tenant(
         name=name.strip(),
@@ -250,8 +268,8 @@ async def edit_tenant(
     monthly_rent: float = Form(0.0),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
-    photo: UploadFile = File(None),
-    id_doc: UploadFile = File(None),
+    photo: Optional[UploadFile] = File(None),
+    id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
@@ -267,12 +285,14 @@ async def edit_tenant(
         tenant.monthly_rent = monthly_rent
         tenant.id_type = id_type
         tenant.id_number = id_number.strip()
+        
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
             tenant.photo_path = new_photo
         new_doc = await save_uploaded_file(id_doc, "documents")
         if new_doc:
             tenant.id_document_path = new_doc
+            
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -300,8 +320,8 @@ async def add_family_member(
     age: Optional[int] = Form(None),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
-    photo: UploadFile = File(None),
-    id_doc: UploadFile = File(None),
+    photo: Optional[UploadFile] = File(None),
+    id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
@@ -336,8 +356,8 @@ async def edit_family_member(
     age: Optional[int] = Form(None),
     id_type: str = Form("Aadhar Card"),
     id_number: str = Form(""),
-    photo: UploadFile = File(None),
-    id_doc: UploadFile = File(None),
+    photo: Optional[UploadFile] = File(None),
+    id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_current_user(request, db)
@@ -353,12 +373,14 @@ async def edit_family_member(
         member.age = age
         member.id_type = id_type
         member.id_number = id_number.strip()
+        
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
             member.photo_path = new_photo
         new_doc = await save_uploaded_file(id_doc, "documents")
         if new_doc:
             member.id_document_path = new_doc
+            
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -389,7 +411,7 @@ async def record_payment(
     water_prev_reading: float = Form(0.0),
     water_curr_reading: float = Form(0.0),
     for_month: str = Form(...),
-    payment_date: str = Form(None),
+    payment_date: Optional[str] = Form(None),
     payment_mode: str = Form("UPI"),
     notes: str = Form(""),
     db: AsyncSession = Depends(get_db)
@@ -399,7 +421,12 @@ async def record_payment(
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     total_amount = float(fixed_rent) + float(water_bill) + float(electricity_bill) + float(other_charges)
-    pay_dt = datetime.strptime(payment_date, "%Y-%m-%d").date() if payment_date else date.today()
+    pay_dt = date.today()
+    if payment_date and payment_date.strip():
+        try:
+            pay_dt = datetime.strptime(payment_date.strip(), "%Y-%m-%d").date()
+        except Exception:
+            pay_dt = date.today()
 
     payment = RentPayment(
         tenant_id=tenant_id,
@@ -434,7 +461,7 @@ async def edit_payment(
     water_prev_reading: float = Form(0.0),
     water_curr_reading: float = Form(0.0),
     for_month: str = Form(...),
-    payment_date: str = Form(None),
+    payment_date: Optional[str] = Form(None),
     payment_mode: str = Form("UPI"),
     notes: str = Form(""),
     db: AsyncSession = Depends(get_db)
@@ -456,8 +483,11 @@ async def edit_payment(
         payment.water_prev_reading = water_prev_reading
         payment.water_curr_reading = water_curr_reading
         payment.for_month = for_month.strip()
-        if payment_date:
-            payment.payment_date = datetime.strptime(payment_date, "%Y-%m-%d").date()
+        if payment_date and payment_date.strip():
+            try:
+                payment.payment_date = datetime.strptime(payment_date.strip(), "%Y-%m-%d").date()
+            except Exception:
+                pass
         payment.payment_mode = payment_mode.strip()
         payment.notes = notes.strip()
         await db.commit()
