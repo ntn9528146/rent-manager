@@ -1,5 +1,10 @@
-import asyncio
+import sys
 import os
+
+# Root folder ko Python path me add karein
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import select
 from dotenv import load_dotenv
