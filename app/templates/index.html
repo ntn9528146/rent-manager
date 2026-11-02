@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rent Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="flex items-center justify-between pb-6 border-b border-slate-700 mb-8">
+            <div>
+                <h1 class="text-3xl font-black text-indigo-400">Rent Manager</h1>
+                <p class="text-sm text-slate-400">Fast, Real-time Monthly Rent Tracking</p>
+            </div>
+            <div class="bg-indigo-950 border border-indigo-500/40 px-4 py-2 rounded-xl text-indigo-300 font-semibold text-sm">
+                Month: {{ current_month }}
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left: Quick Action Forms -->
+            <div class="space-y-6">
+                <!-- Record Rent Payment -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                    <h2 class="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                        <span>💰</span> Record Rent Payment
+                    </h2>
+                    <form action="/payments/record" method="POST" class="space-y-4">
+                        <div>
+                            <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Kirayedar / Room</label>
+                            <select name="tenant_id" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+                                {% for tenant in tenants %}
+                                <option value="{{ tenant.id }}">{{ tenant.room_number }} - {{ tenant.name }} (₹{{ tenant.monthly_rent }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Amount (₹)</label>
+                                <input type="number" step="0.01" name="amount_paid" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">For Month</label>
+                                <input type="text" name="for_month" value="{{ current_month }}" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Mode</label>
+                                <select name="payment_mode" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                                    <option value="UPI">UPI / GPay / PhonePe</option>
+                                    <option value="Cash">Cash</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Note (Optional)</label>
+                                <input type="text" name="notes" placeholder="e.g. Part payment" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/30">
+                            Save Payment
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Add New Tenant -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                    <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                        <span>👤</span> Add New Kirayedar
+                    </h2>
+                    <form action="/tenants/add" method="POST" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Name</label>
+                                <input type="text" name="name" required placeholder="Kirayedar Name" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Room / Floor</label>
+                                <input type="text" name="room_number" required placeholder="Room 101" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Phone</label>
+                                <input type="text" name="phone" placeholder="9876543210" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Fixed Rent (₹)</label>
+                                <input type="number" step="0.01" name="monthly_rent" required placeholder="6500" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-900/30">
+                            Add Tenant
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right: Live Lists & Logs -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Active Tenants -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center justify-between">
+                        <span>Active Rooms / Kirayedar</span>
+                        <span class="text-xs bg-slate-700 px-3 py-1 rounded-full text-slate-300">{{ tenants|length }} Total</span>
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs uppercase bg-slate-950/60 text-slate-400 border-b border-slate-700">
+                                <tr>
+                                    <th class="py-3 px-4">Room</th>
+                                    <th class="py-3 px-4">Name</th>
+                                    <th class="py-3 px-4">Phone</th>
+                                    <th class="py-3 px-4 text-right">Rent</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/60">
+                                {% for tenant in tenants %}
+                                <tr class="hover:bg-slate-700/30 transition-colors">
+                                    <td class="py-3 px-4 font-bold text-amber-300">{{ tenant.room_number }}</td>
+                                    <td class="py-3 px-4 font-medium">{{ tenant.name }}</td>
+                                    <td class="py-3 px-4 text-slate-400">{{ tenant.phone or '-' }}</td>
+                                    <td class="py-3 px-4 font-bold text-emerald-400 text-right">₹{{ tenant.monthly_rent }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-6 text-slate-500">Koi kirayedar add nahi kiya gaya hai.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Payments History -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-bold mb-4">Recent Payment History</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs uppercase bg-slate-950/60 text-slate-400 border-b border-slate-700">
+                                <tr>
+                                    <th class="py-3 px-4">Date</th>
+                                    <th class="py-3 px-4">Month</th>
+                                    <th class="py-3 px-4">Mode</th>
+                                    <th class="py-3 px-4">Notes</th>
+                                    <th class="py-3 px-4 text-right">Received</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/60">
+                                {% for p in payments %}
+                                <tr class="hover:bg-slate-700/30 transition-colors">
+                                    <td class="py-3 px-4 text-slate-400">{{ p.payment_date }}</td>
+                                    <td class="py-3 px-4 font-semibold text-indigo-300">{{ p.for_month }}</td>
+                                    <td class="py-3 px-4"><span class="bg-slate-700 px-2 py-0.5 rounded text-xs">{{ p.payment_mode }}</span></td>
+                                    <td class="py-3 px-4 text-slate-400 text-xs">{{ p.notes or '-' }}</td>
+                                    <td class="py-3 px-4 font-bold text-emerald-400 text-right">₹{{ p.amount_paid }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-6 text-slate-500">Abhi tak koi payment record nahi hui hai.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
