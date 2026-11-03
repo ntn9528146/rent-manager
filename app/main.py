@@ -13,10 +13,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, text
 from sqlalchemy.orm import selectinload
 from jose import JWTError, jwt
+import cloudinary
+import cloudinary.uploader
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.database import async_session, init_db, engine, User, Tenant, FamilyMember, RentPayment, PoliceVerification
 from app.routes.police import router as police_router
 from app.routes.whatsapp_billing import router as billing_router
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME", "etuvojxj"),
+    api_key=os.getenv("CLOUDINARY_API_KEY", "162751417835379"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET", "ewtVZLcX1l_qudf3IxkuESPSkdY"),
+    secure=True
+)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_rent_manager_key_2026")
 ALGORITHM = "HS256"
@@ -97,12 +109,19 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
 async def save_uploaded_file(file: Optional[UploadFile], subfolder: str) -> Optional[str]:
     if not file or not getattr(file, "filename", None) or file.filename.strip() == "":
         return None
+    
     ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    path = os.path.join("uploads", subfolder, unique_filename)
-    with open(path, "wb") as buffer:
+    local_path = os.path.join("uploads", subfolder, unique_filename)
+    with open(local_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    return f"/uploads/{subfolder}/{unique_filename}"
+    
+    try:
+        res = cloudinary.uploader.upload(local_path, folder=f"rent_manager/{subfolder}", resource_type="auto")
+        return res.get("secure_url")
+    except Exception as e:
+        print(f"Cloudinary upload fallback to local: {e}")
+        return f"/uploads/{subfolder}/{unique_filename}"
 
 # --- AUTH ROUTES ---
 @app.get("/login", response_class=HTMLResponse)
@@ -322,7 +341,7 @@ async def delete_tenant(tenant_id: int, request: Request, db: AsyncSession = Dep
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- SAFE FAMILY MEMBER CRUD ---
+# --- FAMILY MEMBER CRUD ---
 @app.post("/tenants/{tenant_id}/members/add")
 async def add_family_member(
     tenant_id: int,
@@ -362,10 +381,8 @@ async def add_family_member(
         )
         db.add(member)
         await db.commit()
-    except Exception as e:
-        print(f"Error adding family member: {e}")
+    except Exception:
         await db.rollback()
-        # Fallback sequence auto-fix on failure
         async with engine.begin() as conn:
             await conn.execute(text("SELECT setval(pg_get_serial_sequence('family_members', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM family_members;"))
         db.add(member)
@@ -425,7 +442,7 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- SAFE PAYMENT CRUD ---
+# --- PAYMENT CRUD ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
