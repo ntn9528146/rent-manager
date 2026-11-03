@@ -6,7 +6,7 @@
     <title>Rent & Property Manager Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .tenant-card { transition: all 0.2s ease; }
+        .tenant-card, .payment-row { transition: all 0.2s ease; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -31,12 +31,12 @@
             <!-- Left Column: Forms -->
             <div class="lg:col-span-5 space-y-6">
 
-                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (Meter reading * 7.5 + 100 Water) -->
+                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (Auto-Saves to DB with Pending/Paid Toggle) -->
                 <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6 rounded-2xl border border-emerald-800/60 shadow-xl">
                     <h2 class="text-lg font-bold text-emerald-400 mb-1 flex items-center gap-2">
                         <span>📲</span> WhatsApp Auto-Bill & QR Generator
                     </h2>
-                    <p class="text-xs text-slate-400 mb-4">Sirf Bijli meter reading dalein, automatic ₹7.5/unit + ₹100 paani calculate hokar kirayedar ke WhatsApp par QR code & payment link bhej dega.</p>
+                    <p class="text-xs text-slate-400 mb-4">Current Bijli reading likhein—record software me <b>auto-save</b> hoga aur kirayedar ke WhatsApp par bill send hoga.</p>
 
                     <form action="/billing/send-whatsapp-bill" method="POST" target="_blank" class="space-y-3">
                         <div>
@@ -44,7 +44,7 @@
                             <select id="wa_tenant_select" name="tenant_id" onchange="syncTenantSelect(this.value)" required class="w-full bg-slate-950 border border-emerald-700/60 rounded-lg p-2.5 text-white text-sm">
                                 <option value="">-- Choose Kirayedar --</option>
                                 {% for t in tenants %}
-                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}" data-phone="{{ t.phone }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
+                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -54,36 +54,36 @@
                                 <input type="month" name="for_month" value="{{ current_month_picker }}" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-slate-400 font-semibold">Paani Bill (Fixed ₹)</label>
+                                <label class="block text-[11px] text-slate-400 font-semibold">Paani (Fixed ₹)</label>
                                 <input type="number" step="0.01" name="water_bill" value="100.0" readonly class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-cyan-300 font-bold">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Other Charges (₹)</label>
-                                <input type="number" step="0.01" name="other_charges" value="0.0" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                                <input type="number" step="0.01" name="other_charges" value="0.0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-[11px] text-slate-400 font-semibold">Previous Elec Reading</label>
-                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                                <label class="block text-[11px] text-slate-400 font-semibold">Previous Reading</label>
+                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-amber-400 font-bold">Current Elec Reading ⚡</label>
-                                <input type="number" step="0.1" id="wa_curr_reading" name="curr_reading" required placeholder="Enter Current" class="w-full bg-slate-950 border border-amber-500 rounded p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 font-semibold">
+                                <label class="block text-[11px] text-amber-400 font-bold">Current Reading ⚡</label>
+                                <input type="number" step="0.1" id="wa_curr_reading" name="curr_reading" required placeholder="Enter Current" class="w-full bg-slate-950 border border-amber-500 rounded p-2 text-xs text-white font-semibold">
                             </div>
                         </div>
                         <div class="flex items-center justify-between text-xs bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                            <span class="text-slate-400">Electricity Rate: <b class="text-amber-400">₹7.5 / Unit</b></span>
+                            <span class="text-slate-400">Bijli Rate: <b class="text-amber-400">₹7.5 / Unit</b></span>
                             <input type="hidden" name="unit_rate" value="7.5">
                             <span class="text-slate-400">Paani: <b class="text-cyan-400">₹100</b></span>
                         </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/40 text-sm flex items-center justify-center gap-2">
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg text-sm flex items-center justify-center gap-2">
                             <span>📲</span> Send WhatsApp Bill with QR Code
                         </button>
                     </form>
                 </div>
 
-                <!-- 2. RECORD PAYMENT DIRECTLY -->
+                <!-- 2. DIRECT MANUAL PAYMENT ENTRY FORM -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
                         <span>⚡</span> Record Rent Payment
@@ -158,64 +158,36 @@
                     </form>
                 </div>
 
-                <!-- 3. ADD NEW KIRAYEDAR -->
+                <!-- 3. ADD TENANT -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
                         <span>👤</span> Add Naya Kirayedar
                     </h2>
                     <form action="/tenants/add" method="POST" enctype="multipart/form-data" class="space-y-3">
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Name</label>
-                                <input type="text" name="name" required placeholder="Full Name" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Room No</label>
-                                <input type="text" name="room_number" required placeholder="Room 101" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
-                            </div>
+                            <input type="text" name="name" required placeholder="Full Name" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
+                            <input type="text" name="room_number" required placeholder="Room No" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Phone</label>
-                                <input type="text" name="phone" placeholder="9876543210" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Fixed Rent (₹)</label>
-                                <input type="number" step="0.01" name="monthly_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
-                            </div>
+                            <input type="text" name="phone" placeholder="9876543210" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
+                            <input type="number" step="0.01" name="monthly_rent" required placeholder="Monthly Rent" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Type</label>
-                                <select name="id_type" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
-                                    <option value="Aadhar Card">Aadhar Card</option>
-                                    <option value="Voter ID">Voter ID</option>
-                                    <option value="Driving License">Driving License</option>
-                                    <option value="PAN Card">PAN Card</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Number</label>
-                                <input type="text" name="id_number" placeholder="XXXX-XXXX-XXXX" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
-                            </div>
+                            <select name="id_type" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
+                                <option value="Aadhar Card">Aadhar Card</option>
+                                <option value="Voter ID">Voter ID</option>
+                                <option value="PAN Card">PAN Card</option>
+                            </select>
+                            <input type="text" name="id_number" placeholder="ID Number" class="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                         </div>
                         <div>
-                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Joining Date 📅</label>
                             <input type="date" name="joining_date" value="{{ today_date }}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Photo</label>
-                                <input type="file" name="photo" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">ID Document</label>
-                                <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
-                            </div>
+                            <input type="file" name="photo" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
+                            <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
                         </div>
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg">
-                            Add Tenant Profile
-                        </button>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg text-white">Add Tenant</button>
                     </form>
                 </div>
             </div>
@@ -228,16 +200,16 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
                         <div>
                             <h2 class="text-xl font-bold flex items-center gap-2">
-                                <span>Kirayedar Profiles</span>
+                                <span>Kirayedar Profile</span>
                                 <span class="text-xs bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-2.5 py-0.5 rounded-full">{{ tenants|length }} Active</span>
                             </h2>
-                            <p class="text-[11px] text-slate-400">Niche dropdown se jise select karenge sirf usi ki detail dikhegi</p>
+                            <p class="text-[11px] text-slate-400">Jise select karenge sirf usi ki Profile aur Payments history samne dikhegi</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <select id="profile_filter_select" onchange="filterTenantProfile(this.value)" class="bg-slate-950 border border-indigo-500/50 text-indigo-300 rounded-lg px-3 py-1.5 text-xs font-semibold">
-                                <option value="all">👁️ Show All Profiles</option>
+                            <select id="profile_filter_select" onchange="syncTenantSelect(this.value)" class="bg-slate-950 border border-indigo-500/50 text-indigo-300 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                                <option value="all">👁️ Show All Kirayedar</option>
                                 {% for t in tenants %}
-                                <option value="tenant-card-{{ t.id }}">{{ t.room_number }} - {{ t.name }}</option>
+                                <option value="{{ t.id }}">{{ t.room_number }} - {{ t.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -246,7 +218,7 @@
                     <!-- Current Active Tenants -->
                     <div class="space-y-4 mt-4" id="active_tenants_container">
                         {% for t in tenants %}
-                        <div id="tenant-card-{{ t.id }}" class="tenant-card bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                        <div id="tenant-card-{{ t.id }}" class="tenant-card bg-slate-950/70 border border-slate-800 rounded-xl p-4" data-tenant-id="{{ t.id }}">
                             <!-- Tenant Header -->
                             <div class="flex items-start justify-between">
                                 <div class="flex items-center gap-3">
@@ -270,12 +242,12 @@
                                 </div>
                                 <div class="flex items-center gap-1.5">
                                     <button type="button" onclick="openModal('edit-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 px-2 py-1 rounded">Edit</button>
-                                    <button type="button" onclick="openModal('leave-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-orange-500/20 hover:bg-orange-500/40 text-orange-300 border border-orange-500/30 px-2 py-1 rounded" title="Room chhod diya">🚪 Left</button>
+                                    <button type="button" onclick="openModal('leave-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-orange-500/20 hover:bg-orange-500/40 text-orange-300 border border-orange-500/30 px-2 py-1 rounded">🚪 Left</button>
                                     <a href="/tenants/{{ t.id }}/delete" onclick="return confirm('Kirayedar delete karein?')" class="text-xs bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 px-2 py-1 rounded">Del</a>
                                 </div>
                             </div>
 
-                            <!-- Police Stayan Box -->
+                            <!-- Police Satyapan Box -->
                             <div class="mt-3 pt-3 border-t border-slate-800 bg-slate-900/50 p-3 rounded-lg">
                                 <span class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
                                     <span>🛡️</span> Police Satyapan Record
@@ -390,7 +362,7 @@
                         {% endfor %}
                     </div>
 
-                    <!-- 4. CHHODE HUE KIRAYEDAR (OLD / VACATED ARCHIVE) -->
+                    <!-- ARCHIVED / LEFT TENANTS -->
                     <div class="mt-8 pt-6 border-t border-slate-800">
                         <details class="group">
                             <summary class="cursor-pointer flex items-center justify-between text-sm font-bold text-slate-400 hover:text-white bg-slate-950/80 p-3 rounded-xl border border-slate-800">
@@ -406,18 +378,10 @@
                                         <div>
                                             <h4 class="font-bold text-slate-200">{{ lt.name }} <span class="text-slate-400">({{ lt.room_number }})</span></h4>
                                             <p class="text-[11px] text-orange-400 font-semibold mt-0.5">🚪 Room Chhodne Ki Date: {{ lt.leaving_date or 'N/A' }} | 📞 {{ lt.phone or '-' }}</p>
-                                            <p class="text-[10px] text-slate-500">🪪 {{ lt.id_type }}: {{ lt.id_number or '-' }}
-                                                {% if lt.id_document_path %} | <a href="{{ lt.id_document_path }}" target="_blank" class="text-indigo-400 underline">ID File</a>{% endif %}
-                                                {% if lt.photo_path %} | <a href="{{ lt.photo_path }}" target="_blank" class="text-indigo-400 underline">Photo</a>{% endif %}
-                                            </p>
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <a href="/tenants/{{ lt.id }}/restore" onclick="return confirm('Kya is kirayedar ko wapas Current list me shamil karna chahte hain?')" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded text-xs hover:bg-emerald-500/40">
-                                                🔄 Restore
-                                            </a>
-                                            <a href="/tenants/{{ lt.id }}/delete" onclick="return confirm('Permanent delete karein?')" class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded text-xs hover:bg-rose-500/40">
-                                                Delete
-                                            </a>
+                                            <a href="/tenants/{{ lt.id }}/restore" onclick="return confirm('Restore this tenant?')" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded text-xs">🔄 Restore</a>
+                                            <a href="/tenants/{{ lt.id }}/delete" onclick="return confirm('Permanent delete?')" class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded text-xs">Delete</a>
                                         </div>
                                     </div>
                                 </div>
@@ -429,9 +393,12 @@
                     </div>
                 </div>
 
-                <!-- PAYMENT RECORDS TABLE -->
+                <!-- PAYMENT & METER READING HISTORY (AUTO-FILTERED PER TENANT) -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                    <h2 class="text-xl font-bold mb-4">Payment & Meter Reading History</h2>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold">Payment & Meter Reading History</h2>
+                        <span id="payment_filter_notice" class="text-xs text-indigo-400 bg-indigo-950 border border-indigo-800 px-2.5 py-1 rounded-lg">Showing All</span>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs">
                             <thead class="uppercase bg-slate-950 text-slate-400 border-b border-slate-800">
@@ -443,12 +410,13 @@
                                     <th class="py-2.5 px-2 text-right">Elec (₹7.5)</th>
                                     <th class="py-2.5 px-2 text-right">Other</th>
                                     <th class="py-2.5 px-2 text-right text-emerald-400 font-bold">Total</th>
+                                    <th class="py-2.5 px-2 text-center">Status</th>
                                     <th class="py-2.5 px-2 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800">
                                 {% for p in payments %}
-                                <tr class="hover:bg-slate-800/40 transition">
+                                <tr class="payment-row hover:bg-slate-800/40 transition" data-tenant-id="{{ p.tenant.id }}">
                                     <td class="py-2.5 px-3 font-semibold text-slate-200">
                                         {{ p.tenant.room_number }} - {{ p.tenant.name }}
                                         <div class="text-[10px] text-slate-400 font-normal">{{ p.payment_mode }} (Date: {{ p.payment_date }})</div>
@@ -467,6 +435,12 @@
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.electricity_bill }}</td>
                                     <td class="py-2.5 px-2 text-right text-slate-300">₹{{ p.other_charges }}</td>
                                     <td class="py-2.5 px-2 text-right font-bold text-emerald-400">₹{{ p.total_paid }}</td>
+                                    <!-- Paid / Pending Status Toggle -->
+                                    <td class="py-2.5 px-2 text-center">
+                                        <a href="/billing/toggle-status/{{ p.id }}" class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border transition {% if p.status == 'Paid' %}bg-emerald-950 text-emerald-300 border-emerald-600 hover:bg-emerald-900{% else %}bg-amber-950 text-amber-300 border-amber-600 hover:bg-amber-900{% endif %}" title="Click to Switch Paid/Pending">
+                                            <span>{% if p.status == 'Paid' %}🟢 Paid{% else %}🟡 Pending{% endif %}</span>
+                                        </a>
+                                    </td>
                                     <td class="py-2.5 px-2 text-center">
                                         <div class="flex items-center justify-center gap-1.5">
                                             <button type="button" onclick="openModal('edit-pay-modal-{{ p.id }}')" class="cursor-pointer text-[10px] bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 px-2.5 py-1 rounded border border-amber-500/30">Edit</button>
@@ -476,7 +450,7 @@
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="8" class="text-center py-6 text-slate-500">Abhi tak koi receipt entry nahi hui hai.</td>
+                                    <td colspan="9" class="text-center py-6 text-slate-500">Abhi tak koi receipt entry nahi hui hai.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -487,7 +461,7 @@
         </div>
     </div>
 
-    <!-- ================= MODALS OUTSIDE TABLES ================= -->
+    <!-- ================= MODALS ================= -->
 
     <!-- Tenant Left Modal -->
     {% for t in tenants %}
@@ -497,10 +471,10 @@
                 <h3 class="font-bold text-sm text-orange-400">Room Chhodne Ka Record - {{ t.name }}</h3>
                 <button type="button" onclick="closeModal('leave-tenant-modal-{{ t.id }}')" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
             </div>
-            <p class="text-xs text-slate-300">Jab aap mark karenge, toh yeh kirayedar current dropdown se hat kar <b>Old / Archive List</b> me save ho jayega.</p>
+            <p class="text-xs text-slate-300">Yeh kirayedar dropdown se hatkar <b>Purane Kirayedar (Archive)</b> me save ho jayega.</p>
             <form action="/tenants/{{ t.id }}/leave" method="POST" class="space-y-3 text-xs">
                 <div>
-                    <label class="block text-slate-400 mb-1 font-semibold">Room Chhodne Ki Taarikh (Date) 📅</label>
+                    <label class="block text-slate-400 mb-1 font-semibold">Room Chhodne Ki Date 📅</label>
                     <input type="date" name="leaving_date" value="{{ today_date }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white text-xs">
                 </div>
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
@@ -639,7 +613,7 @@
     </div>
     {% endfor %}
 
-    <!-- JavaScript Handlers -->
+    <!-- Pure Selective JavaScript Filters (Synchronized Profiles & Payment History) -->
     <script>
         function openModal(id) {
             const m = document.getElementById(id);
@@ -651,49 +625,74 @@
             if (m) m.style.display = 'none';
         }
 
-        // Close on outside click
         window.addEventListener('click', function(e) {
             if (e.target.classList.contains('fixed') && e.target.classList.contains('z-50')) {
                 e.target.style.display = 'none';
             }
         });
 
-        // 1. Sync Dropdowns & Rent value
+        // SINGLE SYNC FUNCTION: Dropdown select karte hi Profile + Payment List dono filter hongi
         function syncTenantSelect(tenantId) {
             if (!tenantId) return;
+
+            // 1. Sync dropdown boxes
             const waSelect = document.getElementById('wa_tenant_select');
             const mainSelect = document.getElementById('main_tenant_select');
             const filterSelect = document.getElementById('profile_filter_select');
-            
-            if (waSelect) waSelect.value = tenantId;
-            if (mainSelect) mainSelect.value = tenantId;
 
-            // Auto-filter right side to show ONLY this tenant
-            if (filterSelect) {
-                filterSelect.value = 'tenant-card-' + tenantId;
-                filterTenantProfile('tenant-card-' + tenantId);
-            }
+            if (waSelect && waSelect.value !== tenantId) waSelect.value = tenantId;
+            if (mainSelect && mainSelect.value !== tenantId) mainSelect.value = tenantId;
+            if (filterSelect && filterSelect.value !== tenantId) filterSelect.value = tenantId;
 
-            // Auto-update rent amount input
-            const selectedOpt = mainSelect.querySelector(`option[value="${tenantId}"]`);
-            if (selectedOpt && selectedOpt.dataset.rent) {
-                document.getElementById('record_fixed_rent').value = selectedOpt.dataset.rent;
-            }
-        }
-
-        // 2. Selective View Filter (Sirf chune hue kirayedar ki detail dikhana)
-        function filterTenantProfile(cardId) {
-            const cards = document.querySelectorAll('.tenant-card');
-            cards.forEach(card => {
-                if (cardId === 'all') {
-                    card.style.display = 'block';
-                } else if (card.id === cardId) {
+            // 2. Filter Profiles on Right
+            const tenantCards = document.querySelectorAll('.tenant-card');
+            tenantCards.forEach(card => {
+                if (tenantId === 'all' || card.dataset.tenantId === String(tenantId)) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
                 }
             });
+
+            // 3. Filter Payment History Records on Right
+            const paymentRows = document.querySelectorAll('.payment-row');
+            let visibleCount = 0;
+            paymentRows.forEach(row => {
+                if (tenantId === 'all' || row.dataset.tenantId === String(tenantId)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Notice badge update
+            const notice = document.getElementById('payment_filter_notice');
+            if (notice) {
+                if (tenantId === 'all') {
+                    notice.innerText = 'Showing All';
+                } else {
+                    const selText = (filterSelect && filterSelect.options[filterSelect.selectedIndex]) ? filterSelect.options[filterSelect.selectedIndex].text : '';
+                    notice.innerText = 'Filtered: ' + selText;
+                }
+            }
+
+            // 4. Update Fixed Rent Input
+            if (mainSelect && tenantId !== 'all') {
+                const opt = mainSelect.querySelector(`option[value="${tenantId}"]`);
+                if (opt && opt.dataset.rent) {
+                    document.getElementById('record_fixed_rent').value = opt.dataset.rent;
+                }
+            }
         }
+
+        // Default: On page load, agar kirayedar maujood hain toh pehle wale ko select karke filter set karein
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstOpt = document.querySelector('#profile_filter_select option:nth-child(2)');
+            if (firstOpt && firstOpt.value !== 'all') {
+                syncTenantSelect(firstOpt.value);
+            }
+        });
     </script>
 </body>
 </html>

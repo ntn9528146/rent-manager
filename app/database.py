@@ -34,7 +34,7 @@ class Tenant(Base):
     photo_path = Column(String(255), nullable=True)
     joining_date = Column(Date, nullable=True)
     leaving_date = Column(Date, nullable=True)
-    is_active = Column(Integer, default=1)  # 1 = Current, 0 = Left / Vacated
+    is_active = Column(Integer, default=1)
 
     members = relationship("FamilyMember", back_populates="tenant", cascade="all, delete-orphan")
     payments = relationship("RentPayment", back_populates="tenant", cascade="all, delete-orphan")
@@ -71,6 +71,7 @@ class RentPayment(Base):
     payment_date = Column(Date, nullable=False)
     for_month = Column(String(20), nullable=False)
     payment_mode = Column(String(50), default="UPI")
+    status = Column(String(20), default="Pending")  # 'Pending' ya 'Paid'
     notes = Column(String(255), default="")
 
     tenant = relationship("Tenant", back_populates="payments")
