@@ -49,13 +49,14 @@ async def on_startup():
     await init_db()
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("""
-                SELECT setval(pg_get_serial_sequence('tenants', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM tenants;
-                SELECT setval(pg_get_serial_sequence('family_members', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM family_members;
-                SELECT setval(pg_get_serial_sequence('rent_payments', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM rent_payments;
-                SELECT setval(pg_get_serial_sequence('police_verifications', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM police_verifications;
-                SELECT setval(pg_get_serial_sequence('users', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM users;
-            """))
+            for tbl in ['family_members', 'tenants', 'rent_payments', 'police_verifications', 'users']:
+                await conn.execute(text(f"""
+                    SELECT setval(
+                        pg_get_serial_sequence('{tbl}', 'id'),
+                        coalesce(max(id), 1),
+                        max(id) IS NOT null
+                    ) FROM {tbl};
+                """))
     except Exception as e:
         print(f"Startup sequence sync notice: {e}")
 
@@ -232,10 +233,10 @@ async def add_tenant(
     request: Request,
     name: str = Form(...),
     room_number: str = Form(...),
-    phone: str = Form(""),
+    phone: Optional[str] = Form(""),
     monthly_rent: Optional[str] = Form("0"),
-    id_type: str = Form("Aadhar Card"),
-    id_number: str = Form(""),
+    id_type: Optional[str] = Form("Aadhar Card"),
+    id_number: Optional[str] = Form(""),
     joining_date: Optional[str] = Form(None),
     photo: Optional[UploadFile] = File(None),
     id_doc: Optional[UploadFile] = File(None),
@@ -258,10 +259,10 @@ async def add_tenant(
     tenant = Tenant(
         name=name.strip(),
         room_number=room_number.strip(),
-        phone=phone.strip(),
+        phone=(phone or "").strip(),
         monthly_rent=safe_float(monthly_rent, 0.0),
-        id_type=id_type,
-        id_number=id_number.strip(),
+        id_type=id_type or "Aadhar Card",
+        id_number=(id_number or "").strip(),
         joining_date=parsed_date,
         photo_path=photo_path,
         id_document_path=doc_path
@@ -276,10 +277,10 @@ async def edit_tenant(
     request: Request,
     name: str = Form(...),
     room_number: str = Form(...),
-    phone: str = Form(""),
+    phone: Optional[str] = Form(""),
     monthly_rent: Optional[str] = Form("0"),
-    id_type: str = Form("Aadhar Card"),
-    id_number: str = Form(""),
+    id_type: Optional[str] = Form("Aadhar Card"),
+    id_number: Optional[str] = Form(""),
     photo: Optional[UploadFile] = File(None),
     id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
@@ -293,10 +294,10 @@ async def edit_tenant(
     if tenant:
         tenant.name = name.strip()
         tenant.room_number = room_number.strip()
-        tenant.phone = phone.strip()
+        tenant.phone = (phone or "").strip()
         tenant.monthly_rent = safe_float(monthly_rent, 0.0)
-        tenant.id_type = id_type
-        tenant.id_number = id_number.strip()
+        tenant.id_type = id_type or "Aadhar Card"
+        tenant.id_number = (id_number or "").strip()
         
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
@@ -321,17 +322,17 @@ async def delete_tenant(tenant_id: int, request: Request, db: AsyncSession = Dep
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- FAMILY MEMBER CRUD ---
+# --- SAFE FAMILY MEMBER CRUD ---
 @app.post("/tenants/{tenant_id}/members/add")
 async def add_family_member(
     tenant_id: int,
     request: Request,
     member_name: str = Form(...),
     relation: str = Form(...),
-    phone: str = Form(""),
+    phone: Optional[str] = Form(""),
     age: Optional[str] = Form(None),
-    id_type: str = Form("Aadhar Card"),
-    id_number: str = Form(""),
+    id_type: Optional[str] = Form("Aadhar Card"),
+    id_number: Optional[str] = Form(""),
     photo: Optional[UploadFile] = File(None),
     id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
@@ -340,26 +341,36 @@ async def add_family_member(
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    photo_path = await save_uploaded_file(photo, "photos")
-    doc_path = await save_uploaded_file(id_doc, "documents")
+    try:
+        photo_path = await save_uploaded_file(photo, "photos")
+        doc_path = await save_uploaded_file(id_doc, "documents")
 
-    parsed_age = None
-    if age and age.strip().isdigit():
-        parsed_age = int(age.strip())
+        parsed_age = None
+        if age and str(age).strip().isdigit():
+            parsed_age = int(str(age).strip())
 
-    member = FamilyMember(
-        tenant_id=tenant_id,
-        name=member_name.strip(),
-        relation=relation.strip(),
-        phone=phone.strip(),
-        age=parsed_age,
-        id_type=id_type,
-        id_number=id_number.strip(),
-        photo_path=photo_path,
-        id_document_path=doc_path
-    )
-    db.add(member)
-    await db.commit()
+        member = FamilyMember(
+            tenant_id=tenant_id,
+            name=member_name.strip(),
+            relation=relation.strip(),
+            phone=(phone or "").strip(),
+            age=parsed_age,
+            id_type=id_type or "Aadhar Card",
+            id_number=(id_number or "").strip(),
+            photo_path=photo_path,
+            id_document_path=doc_path
+        )
+        db.add(member)
+        await db.commit()
+    except Exception as e:
+        print(f"Error adding family member: {e}")
+        await db.rollback()
+        # Fallback sequence auto-fix on failure
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT setval(pg_get_serial_sequence('family_members', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM family_members;"))
+        db.add(member)
+        await db.commit()
+
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/members/{member_id}/edit")
@@ -368,10 +379,10 @@ async def edit_family_member(
     request: Request,
     member_name: str = Form(...),
     relation: str = Form(...),
-    phone: str = Form(""),
+    phone: Optional[str] = Form(""),
     age: Optional[str] = Form(None),
-    id_type: str = Form("Aadhar Card"),
-    id_number: str = Form(""),
+    id_type: Optional[str] = Form("Aadhar Card"),
+    id_number: Optional[str] = Form(""),
     photo: Optional[UploadFile] = File(None),
     id_doc: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db)
@@ -385,11 +396,11 @@ async def edit_family_member(
     if member:
         member.name = member_name.strip()
         member.relation = relation.strip()
-        member.phone = phone.strip()
-        if age and age.strip().isdigit():
-            member.age = int(age.strip())
-        member.id_type = id_type
-        member.id_number = id_number.strip()
+        member.phone = (phone or "").strip()
+        if age and str(age).strip().isdigit():
+            member.age = int(str(age).strip())
+        member.id_type = id_type or "Aadhar Card"
+        member.id_number = (id_number or "").strip()
         
         new_photo = await save_uploaded_file(photo, "photos")
         if new_photo:
@@ -414,7 +425,7 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- SAFE PAYMENT CRUD (Zero Exception on empty fields) ---
+# --- SAFE PAYMENT CRUD ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
