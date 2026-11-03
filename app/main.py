@@ -16,6 +16,7 @@ from jose import JWTError, jwt
 
 from app.database import async_session, init_db, engine, User, Tenant, FamilyMember, RentPayment, PoliceVerification
 from app.routes.police import router as police_router
+from app.routes.whatsapp_billing import router as billing_router
 
 SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_rent_manager_key_2026")
 ALGORITHM = "HS256"
@@ -30,6 +31,7 @@ os.makedirs("uploads/police_docs", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(police_router)
+app.include_router(billing_router)
 
 def safe_float(val: Optional[str], default: float = 0.0) -> float:
     if val is None:
