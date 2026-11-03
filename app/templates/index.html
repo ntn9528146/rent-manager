@@ -31,20 +31,20 @@
             <!-- Left Column: Forms -->
             <div class="lg:col-span-5 space-y-6">
 
-                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (With Water Tanker/Other & Live Total) -->
+                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (Auto-Loads Last Reading by Room) -->
                 <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6 rounded-2xl border border-emerald-800/60 shadow-xl">
                     <h2 class="text-lg font-bold text-emerald-400 mb-1 flex items-center gap-2">
                         <span>📲</span> WhatsApp Auto-Bill & QR Generator
                     </h2>
-                    <p class="text-xs text-slate-400 mb-4">Reading dalein—record software me <b>auto-save</b> hoga aur kirayedar ke WhatsApp par bill send hoga.</p>
+                    <p class="text-xs text-slate-400 mb-4">Kirayedar select karte hi us <b>Room</b> ki pichli bijli reading auto aa jayegi.</p>
 
                     <form action="/billing/send-whatsapp-bill" method="POST" target="_blank" class="space-y-3">
                         <div>
                             <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Current Kirayedar</label>
                             <select id="wa_tenant_select" name="tenant_id" onchange="syncTenantSelect(this.value)" required class="w-full bg-slate-950 border border-emerald-700/60 rounded-lg p-2.5 text-white text-sm">
                                 <option value="">-- Choose Kirayedar --</option>
-                                {% for t in tenants %}
-                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
+                                {% for item in tenants_with_readings %}
+                                <option value="{{ item.tenant.id }}" data-rent="{{ item.tenant.monthly_rent }}" data-last-reading="{{ item.last_reading }}">{{ item.tenant.room_number }} - {{ item.tenant.name }} (Fixed: ₹{{ item.tenant.monthly_rent }})</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -76,8 +76,8 @@
 
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-[11px] text-slate-400 font-semibold">Previous Reading</label>
-                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" oninput="calculateLiveTotal()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                                <label class="block text-[11px] text-cyan-400 font-bold">Previous Reading (Auto ⚡)</label>
+                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" oninput="calculateLiveTotal()" class="w-full bg-slate-900 border border-cyan-700/60 rounded p-2 text-xs text-cyan-300 font-semibold">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-amber-400 font-bold">Current Reading ⚡</label>
@@ -118,8 +118,8 @@
                         <div>
                             <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Tenant</label>
                             <select id="main_tenant_select" name="tenant_id" onchange="syncTenantSelect(this.value)" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
-                                {% for t in tenants %}
-                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
+                                {% for item in tenants_with_readings %}
+                                <option value="{{ item.tenant.id }}" data-rent="{{ item.tenant.monthly_rent }}" data-last-reading="{{ item.last_reading }}">{{ item.tenant.room_number }} - {{ item.tenant.name }} (Fixed: ₹{{ item.tenant.monthly_rent }})</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -156,7 +156,7 @@
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                     <label class="text-slate-400">Elec Prev Reading</label>
-                                    <input type="number" step="0.1" name="elec_prev_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                    <input type="number" step="0.1" id="record_prev_reading" name="elec_prev_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
                                 </div>
                                 <div>
                                     <label class="text-slate-400">Elec Current Reading</label>
@@ -492,7 +492,7 @@
 
     <!-- ================= MODALS ================= -->
 
-    <!-- Status Change Modal (Cash with receiver name vs Online vs Pending) -->
+    <!-- Status Change Modal -->
     {% for p in payments %}
     <div id="status-pay-modal-{{ p.id }}" style="display: none;" class="fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
         <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
@@ -642,7 +642,7 @@
         {% endfor %}
     {% endfor %}
 
-    <!-- Payment Edit Modals -->
+    <!-- Payment Edit Modals (Bulletproof Fixed) -->
     {% for p in payments %}
     <div id="edit-pay-modal-{{ p.id }}" style="display: none;" class="fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
         <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full space-y-3 shadow-2xl">
@@ -652,18 +652,56 @@
             </div>
             <form action="/payments/{{ p.id }}/edit" method="POST" class="space-y-2 text-xs">
                 <div class="grid grid-cols-2 gap-2">
-                    <input type="month" name="for_month" value="{{ p.for_month }}" required class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    <input type="date" name="payment_date" value="{{ p.payment_date }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Rent Month</label>
+                        <input type="month" name="for_month" value="{{ p.for_month }}" required class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Payment Date</label>
+                        <input type="date" name="payment_date" value="{{ p.payment_date }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <input type="number" step="0.01" name="fixed_rent" value="{{ p.fixed_rent }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    <input type="number" step="0.01" name="water_bill" value="{{ p.water_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    <input type="number" step="0.01" name="electricity_bill" value="{{ p.electricity_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    <input type="number" step="0.01" name="other_charges" value="{{ p.other_charges }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Fixed Rent (₹)</label>
+                        <input type="number" step="0.01" name="fixed_rent" value="{{ p.fixed_rent }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Water Bill (₹)</label>
+                        <input type="number" step="0.01" name="water_bill" value="{{ p.water_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Electricity Bill (₹)</label>
+                        <input type="number" step="0.01" name="electricity_bill" value="{{ p.electricity_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Other Charges (₹)</label>
+                        <input type="number" step="0.01" name="other_charges" value="{{ p.other_charges }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <input type="number" step="0.1" name="elec_prev_reading" value="{{ p.elec_prev_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    <input type="number" step="0.1" name="elec_curr_reading" value="{{ p.elec_curr_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Elec Prev Reading</label>
+                        <input type="number" step="0.1" name="elec_prev_reading" value="{{ p.elec_prev_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Elec Curr Reading</label>
+                        <input type="number" step="0.1" name="elec_curr_reading" value="{{ p.elec_curr_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Payment Mode</label>
+                        <select name="payment_mode" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                            <option value="UPI" {% if p.payment_mode == 'UPI' or p.payment_mode == 'Online / UPI' %}selected{% endif %}>UPI / Online</option>
+                            <option value="Cash" {% if p.payment_mode == 'Cash' %}selected{% endif %}>Cash</option>
+                            <option value="Pending" {% if p.payment_mode == 'Pending' %}selected{% endif %}>Pending</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-[10px]">Notes</label>
+                        <input type="text" name="notes" value="{{ p.notes or '' }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    </div>
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
                     <button type="button" onclick="closeModal('edit-pay-modal-{{ p.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
@@ -726,7 +764,7 @@
             document.getElementById('wa_total_pay_display').innerText = '₹' + totalDue.toFixed(1);
         }
 
-        // SYNC DROPDOWNS & FILTER
+        // SYNC DROPDOWNS & AUTO-LOAD ROOM'S LAST READING
         function syncTenantSelect(tenantId) {
             if (!tenantId) return;
 
@@ -738,7 +776,24 @@
             if (mainSelect && mainSelect.value !== tenantId) mainSelect.value = tenantId;
             if (filterSelect && filterSelect.value !== tenantId) filterSelect.value = tenantId;
 
-            // Filter Profiles on Right
+            // 1. Auto Load Room's Previous Electricity Reading
+            let lastReading = 0.0;
+            if (waSelect) {
+                const opt = waSelect.querySelector(`option[value="${tenantId}"]`);
+                if (opt && opt.dataset.lastReading) {
+                    lastReading = parseFloat(opt.dataset.lastReading) || 0.0;
+                }
+            }
+            const prevInput = document.getElementById('wa_prev_reading');
+            if (prevInput) {
+                prevInput.value = lastReading;
+            }
+            const recordPrevInput = document.getElementById('record_prev_reading');
+            if (recordPrevInput) {
+                recordPrevInput.value = lastReading;
+            }
+
+            // 2. Filter Profiles on Right
             const tenantCards = document.querySelectorAll('.tenant-card');
             tenantCards.forEach(card => {
                 if (tenantId === 'all' || card.dataset.tenantId === String(tenantId)) {
@@ -748,7 +803,7 @@
                 }
             });
 
-            // Filter Payment History Records on Right
+            // 3. Filter Payment History Records on Right
             const paymentRows = document.querySelectorAll('.payment-row');
             paymentRows.forEach(row => {
                 if (tenantId === 'all' || row.dataset.tenantId === String(tenantId)) {

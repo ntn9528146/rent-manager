@@ -201,14 +201,13 @@ async def logout():
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# --- MAIN DASHBOARD (Filtered Active & Vacated/Left) ---
+# --- DASHBOARD WITH ROOM-BASED LATEST READING LOOKUP ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    # 1. Current Active Tenants (Dropdown & Active list)
     result_active = await db.execute(
         select(Tenant)
         .options(selectinload(Tenant.members), selectinload(Tenant.verifications))
@@ -217,7 +216,6 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
     )
     active_tenants = result_active.scalars().all()
 
-    # 2. Left / Vacated Tenants (Archived)
     result_left = await db.execute(
         select(Tenant)
         .options(selectinload(Tenant.members), selectinload(Tenant.verifications))
@@ -226,11 +224,31 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
     )
     left_tenants = result_left.scalars().all()
 
-    # 3. Payments
     result_payments = await db.execute(
-        select(RentPayment).options(selectinload(RentPayment.tenant)).order_by(desc(RentPayment.for_month), desc(RentPayment.payment_date)).limit(50)
+        select(RentPayment)
+        .options(selectinload(RentPayment.tenant))
+        .order_by(desc(RentPayment.for_month), desc(RentPayment.payment_date), desc(RentPayment.id))
+        .limit(100)
     )
     payments = result_payments.scalars().all()
+
+    # Room number ke according sabse latest electricity current reading map karna
+    room_last_readings = {}
+    for p in payments:
+        if p.tenant and p.tenant.room_number:
+            rm = p.tenant.room_number.strip()
+            if rm not in room_last_readings:
+                room_last_readings[rm] = float(p.elec_curr_reading or 0.0)
+
+    # Har active tenant ke sath uske room ki latest reading jodna
+    tenant_list_with_readings = []
+    for t in active_tenants:
+        rm = t.room_number.strip()
+        last_rd = room_last_readings.get(rm, 0.0)
+        tenant_list_with_readings.append({
+            "tenant": t,
+            "last_reading": last_rd
+        })
 
     current_month_picker = date.today().strftime("%Y-%m")
     today_date = date.today().strftime("%Y-%m-%d")
@@ -241,6 +259,7 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
         context={
             "user": user,
             "tenants": active_tenants,
+            "tenants_with_readings": tenant_list_with_readings,
             "left_tenants": left_tenants,
             "payments": payments,
             "current_month_picker": current_month_picker,
@@ -500,7 +519,7 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- PAYMENT CRUD ---
+# --- COMPLETELY BULLETPROOF PAYMENT EDIT & RECORD ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
@@ -551,6 +570,7 @@ async def record_payment(
             for_month=for_month.strip(),
             payment_date=pay_dt,
             payment_mode=payment_mode.strip() if payment_mode else "UPI",
+            status="Pending",
             notes=notes.strip() if notes else ""
         )
         db.add(payment)
@@ -574,6 +594,7 @@ async def record_payment(
             for_month=for_month.strip(),
             payment_date=pay_dt,
             payment_mode=payment_mode.strip() if payment_mode else "UPI",
+            status="Pending",
             notes=notes.strip() if notes else ""
         )
         db.add(payment)
@@ -585,6 +606,8 @@ async def record_payment(
 async def edit_payment(
     payment_id: int,
     request: Request,
+    for_month: str = Form(...),
+    payment_date: Optional[str] = Form(None),
     fixed_rent: Optional[str] = Form("0"),
     water_bill: Optional[str] = Form("0"),
     electricity_bill: Optional[str] = Form("0"),
@@ -593,9 +616,7 @@ async def edit_payment(
     elec_curr_reading: Optional[str] = Form("0"),
     water_prev_reading: Optional[str] = Form("0"),
     water_curr_reading: Optional[str] = Form("0"),
-    for_month: str = Form(...),
-    payment_date: Optional[str] = Form(None),
-    payment_mode: str = Form("UPI"),
+    payment_mode: Optional[str] = Form("UPI"),
     notes: Optional[str] = Form(""),
     db: AsyncSession = Depends(get_db)
 ):
@@ -621,13 +642,18 @@ async def edit_payment(
         payment.water_prev_reading = safe_float(water_prev_reading, 0.0)
         payment.water_curr_reading = safe_float(water_curr_reading, 0.0)
         payment.for_month = for_month.strip()
+        
         if payment_date and payment_date.strip():
             try:
                 payment.payment_date = datetime.strptime(payment_date.strip(), "%Y-%m-%d").date()
             except Exception:
                 pass
-        payment.payment_mode = payment_mode.strip() if payment_mode else "UPI"
-        payment.notes = notes.strip() if notes else ""
+        
+        if payment_mode and payment_mode.strip():
+            payment.payment_mode = payment_mode.strip()
+        if notes is not None:
+            payment.notes = notes.strip()
+            
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
