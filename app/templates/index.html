@@ -48,7 +48,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-3 gap-2">
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Rent Month 📅</label>
                                 <input type="month" name="for_month" value="{{ current_month_picker }}" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
@@ -56,6 +56,10 @@
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Paani Bill (Fixed ₹)</label>
                                 <input type="number" step="0.01" name="water_bill" value="100.0" readonly class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-cyan-300 font-bold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400 font-semibold">Other Charges (₹)</label>
+                                <input type="number" step="0.01" name="other_charges" value="0.0" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
