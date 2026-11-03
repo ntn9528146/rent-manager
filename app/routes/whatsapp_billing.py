@@ -33,6 +33,7 @@ async def send_whatsapp_bill(
     prev_reading: float = Form(0.0),
     unit_rate: float = Form(DEFAULT_ELEC_UNIT_RATE),
     water_bill: float = Form(DEFAULT_WATER_BILL),
+    other_type: str = Form("Other"),
     other_charges: float = Form(0.0),
     db: AsyncSession = Depends(get_db)
 ):
@@ -50,6 +51,7 @@ async def send_whatsapp_bill(
     formatted_month = format_month_name(for_month)
 
     # 1. AUTO-SAVE RECORD IN DATABASE (With Status = Pending)
+    notes_val = f"WhatsApp Bill ({other_type}: ₹{other_amt})" if other_amt > 0 else "Generated via WhatsApp Auto-Bill"
     try:
         payment = RentPayment(
             tenant_id=tenant_id,
@@ -64,9 +66,9 @@ async def send_whatsapp_bill(
             water_curr_reading=0.0,
             for_month=for_month.strip(),
             payment_date=date.today(),
-            payment_mode="UPI",
+            payment_mode="Pending",
             status="Pending",
-            notes="Generated via WhatsApp Auto-Bill"
+            notes=notes_val
         )
         db.add(payment)
         await db.commit()
@@ -88,26 +90,29 @@ async def send_whatsapp_bill(
             water_curr_reading=0.0,
             for_month=for_month.strip(),
             payment_date=date.today(),
-            payment_mode="UPI",
+            payment_mode="Pending",
             status="Pending",
-            notes="Generated via WhatsApp Auto-Bill"
+            notes=notes_val
         )
         db.add(payment)
         await db.commit()
 
-    # 2. UPI Intent URL & Clean Instant QR Code
+    # 2. Dynamic UPI & QR Code URL
     upi_url = f"upi://pay?pa={YOUR_UPI_ID}&pn={urllib.parse.quote(YOUR_NAME)}&am={total_due}&cu=INR&tn=Rent-{urllib.parse.quote(formatted_month)}"
     qr_view_url = f"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={urllib.parse.quote(upi_url)}"
 
+    other_label = "Water Tanker" if other_type == "Water Tanker" else "Anya Charges"
+
+    # Message me rate/unit nahi aayega, seedhe previous, current, units aur amount
     msg = (
         f"🏠 *RENT & UTILITY BILL*\n"
         f"----------------------------------\n"
         f"Kirayedar: *{tenant.name}*\n"
         f"Month: *{formatted_month}*\n\n"
         f"1. Fixed Rent: *₹{fixed_rent}*\n"
-        f"2. Bijli ({prev_reading} se {curr_reading} = {units} unit @ ₹{unit_rate}): *₹{elec_amount}*\n"
+        f"2. Bijli Bill (Last: {prev_reading} se Curr: {curr_reading} | {units} unit): *₹{elec_amount}*\n"
         f"3. Paani Charges (Fixed): *₹{water_bill}*\n"
-        f"4. Anya Charges: *₹{other_amt}*\n"
+        f"4. {other_label}: *₹{other_amt}*\n"
         f"----------------------------------\n"
         f"👉 *KUL RASHI (TOTAL DUE): ₹{total_due}*\n"
         f"----------------------------------\n\n"
@@ -124,11 +129,24 @@ async def send_whatsapp_bill(
     wa_url = f"https://wa.me/{clean_phone}?text={encoded_msg}"
     return RedirectResponse(url=wa_url, status_code=status.HTTP_303_SEE_OTHER)
 
-@router.get("/toggle-status/{payment_id}")
-async def toggle_payment_status(payment_id: int, db: AsyncSession = Depends(get_db)):
+@router.post("/update-payment-status")
+async def update_payment_status(
+    payment_id: int = Form(...),
+    pay_status: str = Form(...),
+    cash_receiver: str = Form(""),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(RentPayment).where(RentPayment.id == payment_id))
     payment = result.scalar_one_or_none()
     if payment:
-        payment.status = "Paid" if payment.status == "Pending" else "Pending"
+        payment.status = pay_status
+        if pay_status == "Cash Paid":
+            payment.payment_mode = "Cash"
+            if cash_receiver.strip():
+                payment.notes = f"Cash given to: {cash_receiver.strip()}"
+        elif pay_status == "Online Paid":
+            payment.payment_mode = "Online / UPI"
+        else:
+            payment.payment_mode = "Pending"
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
