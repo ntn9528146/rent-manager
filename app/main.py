@@ -109,15 +109,12 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
 async def save_uploaded_file(file: Optional[UploadFile], subfolder: str) -> Optional[str]:
     if not file or not hasattr(file, "filename") or not file.filename or not file.filename.strip():
         return None
-    
     try:
         ext = os.path.splitext(file.filename)[1]
         unique_filename = f"{uuid.uuid4().hex}{ext}"
         local_path = os.path.join("uploads", subfolder, unique_filename)
         with open(local_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
-        # Cloudinary direct upload
         if os.getenv("CLOUDINARY_CLOUD_NAME"):
             res = cloudinary.uploader.upload(local_path, folder=f"rent_manager/{subfolder}", resource_type="auto")
             return res.get("secure_url")
@@ -142,9 +139,7 @@ async def login_action(
     result = await db.execute(select(User).where(User.username == username.strip()))
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.hashed_password):
-        return templates.TemplateResponse(
-            request=request, name="login.html", context={"error": "Galat Username ya Password!"}
-        )
+        return templates.TemplateResponse(request=request, name="login.html", context={"error": "Galat Username ya Password!"})
 
     token_expiry = timedelta(days=30) if remember_me else timedelta(days=1)
     cookie_max_age = (30 * 24 * 3600) if remember_me else (24 * 3600)
@@ -167,22 +162,16 @@ async def reset_password_action(
     db: AsyncSession = Depends(get_db)
 ):
     if new_password != confirm_password:
-        return templates.TemplateResponse(
-            request=request, name="reset_password.html", context={"error": "Dono password match nahi hue!", "msg": None}
-        )
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Dono password match nahi hue!", "msg": None})
 
     result = await db.execute(select(User).where(User.username == username.strip()))
     user = result.scalar_one_or_none()
     if not user:
-        return templates.TemplateResponse(
-            request=request, name="reset_password.html", context={"error": "Yeh username registered nahi hai!", "msg": None}
-        )
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Yeh username registered nahi hai!", "msg": None})
 
     user.hashed_password = hash_password(new_password)
     await db.commit()
-    return templates.TemplateResponse(
-        request=request, name="reset_password.html", context={"error": None, "msg": "Password kamyabi se update ho gaya! Ab aap login kar sakte hain."}
-    )
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": "Password kamyabi se update ho gaya! Ab aap login kar sakte hain."})
 
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
@@ -198,9 +187,7 @@ async def signup_action(
 ):
     result = await db.execute(select(User).where(User.username == username.strip()))
     if result.scalar_one_or_none():
-        return templates.TemplateResponse(
-            request=request, name="signup.html", context={"error": "Username pehle se maujood hai!"}
-        )
+        return templates.TemplateResponse(request=request, name="signup.html", context={"error": "Username pehle se maujood hai!"})
 
     hashed = hash_password(password)
     user = User(username=username.strip(), hashed_password=hashed, full_name=full_name.strip())
@@ -214,21 +201,32 @@ async def logout():
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# --- DASHBOARD ---
+# --- MAIN DASHBOARD (Filtered Active & Vacated/Left) ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    result_tenants = await db.execute(
+    # 1. Current Active Tenants (Dropdown & Active list)
+    result_active = await db.execute(
         select(Tenant)
         .options(selectinload(Tenant.members), selectinload(Tenant.verifications))
         .where(Tenant.is_active == 1)
         .order_by(Tenant.room_number)
     )
-    tenants = result_tenants.scalars().all()
+    active_tenants = result_active.scalars().all()
 
+    # 2. Left / Vacated Tenants (Archived)
+    result_left = await db.execute(
+        select(Tenant)
+        .options(selectinload(Tenant.members), selectinload(Tenant.verifications))
+        .where(Tenant.is_active == 0)
+        .order_by(desc(Tenant.leaving_date))
+    )
+    left_tenants = result_left.scalars().all()
+
+    # 3. Payments
     result_payments = await db.execute(
         select(RentPayment).options(selectinload(RentPayment.tenant)).order_by(desc(RentPayment.for_month), desc(RentPayment.payment_date)).limit(50)
     )
@@ -242,14 +240,15 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
         name="index.html",
         context={
             "user": user,
-            "tenants": tenants,
+            "tenants": active_tenants,
+            "left_tenants": left_tenants,
             "payments": payments,
             "current_month_picker": current_month_picker,
             "today_date": today_date
         }
     )
 
-# --- TENANT CRUD ---
+# --- TENANT CRUD + LEAVING WORKFLOW ---
 @app.post("/tenants/add")
 async def add_tenant(
     request: Request,
@@ -286,11 +285,55 @@ async def add_tenant(
         id_type=id_type or "Aadhar Card",
         id_number=(id_number or "").strip(),
         joining_date=parsed_date,
+        is_active=1,
         photo_path=photo_path,
         id_document_path=doc_path
     )
     db.add(tenant)
     await db.commit()
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/tenants/{tenant_id}/leave")
+async def tenant_leave(
+    tenant_id: int,
+    request: Request,
+    leaving_date: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    if tenant:
+        l_date = date.today()
+        if leaving_date and leaving_date.strip():
+            try:
+                l_date = datetime.strptime(leaving_date.strip(), "%Y-%m-%d").date()
+            except Exception:
+                l_date = date.today()
+        tenant.is_active = 0
+        tenant.leaving_date = l_date
+        await db.commit()
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.get("/tenants/{tenant_id}/restore")
+async def tenant_restore(
+    tenant_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    if tenant:
+        tenant.is_active = 1
+        tenant.leaving_date = None
+        await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/tenants/{tenant_id}/edit")
@@ -344,7 +387,7 @@ async def delete_tenant(tenant_id: int, request: Request, db: AsyncSession = Dep
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- 100% BULLETPROOF FAMILY MEMBER CRUD ---
+# --- FAMILY MEMBER CRUD ---
 @app.post("/tenants/{tenant_id}/members/add")
 async def add_family_member(
     tenant_id: int,
@@ -384,10 +427,8 @@ async def add_family_member(
         )
         db.add(member)
         await db.commit()
-    except Exception as e:
-        print(f"Direct insert retry with next ID: {e}")
+    except Exception:
         await db.rollback()
-        # Fallback: manually fetch max ID and insert to prevent sequence block
         max_id_res = await db.execute(select(func.coalesce(func.max(FamilyMember.id), 0)))
         next_id = max_id_res.scalar() + 1
         member = FamilyMember(
@@ -465,7 +506,7 @@ async def record_payment(
     request: Request,
     tenant_id: int = Form(...),
     fixed_rent: Optional[str] = Form("0"),
-    water_bill: Optional[str] = Form("0"),
+    water_bill: Optional[str] = Form("100"),
     electricity_bill: Optional[str] = Form("0"),
     other_charges: Optional[str] = Form("0"),
     elec_prev_reading: Optional[str] = Form("0"),
@@ -483,7 +524,7 @@ async def record_payment(
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     f_rent = safe_float(fixed_rent, 0.0)
-    w_bill = safe_float(water_bill, 0.0)
+    w_bill = safe_float(water_bill, 100.0)
     e_bill = safe_float(electricity_bill, 0.0)
     o_charges = safe_float(other_charges, 0.0)
     total_amount = f_rent + w_bill + e_bill + o_charges

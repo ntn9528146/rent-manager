@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rent & Property Manager Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tenant-card { transition: all 0.2s ease; }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 py-6">
@@ -25,25 +28,74 @@
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Left Panel (5 cols) -->
+            <!-- Left Column: Forms -->
             <div class="lg:col-span-5 space-y-6">
-                <!-- Record Rent & Meter Readings Form -->
+
+                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (Meter reading * 7.5 + 100 Water) -->
+                <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6 rounded-2xl border border-emerald-800/60 shadow-xl">
+                    <h2 class="text-lg font-bold text-emerald-400 mb-1 flex items-center gap-2">
+                        <span>📲</span> WhatsApp Auto-Bill & QR Generator
+                    </h2>
+                    <p class="text-xs text-slate-400 mb-4">Sirf Bijli meter reading dalein, automatic ₹7.5/unit + ₹100 paani calculate hokar kirayedar ke WhatsApp par QR code & payment link bhej dega.</p>
+
+                    <form action="/billing/send-whatsapp-bill" method="POST" target="_blank" class="space-y-3">
+                        <div>
+                            <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Current Kirayedar</label>
+                            <select id="wa_tenant_select" name="tenant_id" onchange="syncTenantSelect(this.value)" required class="w-full bg-slate-950 border border-emerald-700/60 rounded-lg p-2.5 text-white text-sm">
+                                <option value="">-- Choose Kirayedar --</option>
+                                {% for t in tenants %}
+                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}" data-phone="{{ t.phone }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-slate-400 font-semibold">Rent Month 📅</label>
+                                <input type="month" name="for_month" value="{{ current_month_picker }}" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400 font-semibold">Paani Bill (Fixed ₹)</label>
+                                <input type="number" step="0.01" name="water_bill" value="100.0" readonly class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-cyan-300 font-bold">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-slate-400 font-semibold">Previous Elec Reading</label>
+                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-amber-400 font-bold">Current Elec Reading ⚡</label>
+                                <input type="number" step="0.1" id="wa_curr_reading" name="curr_reading" required placeholder="Enter Current" class="w-full bg-slate-950 border border-amber-500 rounded p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 font-semibold">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between text-xs bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">Electricity Rate: <b class="text-amber-400">₹7.5 / Unit</b></span>
+                            <input type="hidden" name="unit_rate" value="7.5">
+                            <span class="text-slate-400">Paani: <b class="text-cyan-400">₹100</b></span>
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/40 text-sm flex items-center justify-center gap-2">
+                            <span>📲</span> Send WhatsApp Bill with QR Code
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 2. RECORD PAYMENT DIRECTLY -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                    <h2 class="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                        <span>⚡</span> Record Rent & Meter Readings
+                    <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                        <span>⚡</span> Record Rent Payment
                     </h2>
                     <form action="/payments/record" method="POST" class="space-y-4">
                         <div>
                             <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Select Tenant</label>
-                            <select name="tenant_id" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="main_tenant_select" name="tenant_id" onchange="syncTenantSelect(this.value)" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
                                 {% for t in tenants %}
-                                <option value="{{ t.id }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
+                                <option value="{{ t.id }}" data-rent="{{ t.monthly_rent }}">{{ t.room_number }} - {{ t.name }} (Fixed: ₹{{ t.monthly_rent }})</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
                             <div>
-                                <label class="block text-xs uppercase text-amber-400 font-bold mb-1">Rent Month/Year 📅</label>
+                                <label class="block text-xs uppercase text-amber-400 font-bold mb-1">Rent Month 📅</label>
                                 <input type="month" name="for_month" value="{{ current_month_picker }}" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs">
                             </div>
                             <div>
@@ -54,11 +106,11 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">1. Fixed Rent (₹)</label>
-                                <input type="number" step="0.01" name="fixed_rent" required placeholder="5000" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
+                                <input type="number" step="0.01" id="record_fixed_rent" name="fixed_rent" value="{% if tenants %}{{ tenants[0].monthly_rent }}{% else %}0{% endif %}" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">2. Water Bill (₹)</label>
-                                <input type="number" step="0.01" name="water_bill" value="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
+                                <input type="number" step="0.01" name="water_bill" value="100.0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs uppercase text-slate-400 font-bold mb-1">3. Electricity Bill (₹)</label>
@@ -70,7 +122,7 @@
                             </div>
                         </div>
                         <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-3">
-                            <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">Meter Readings Tracking</span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">Meter Readings</span>
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                     <label class="text-slate-400">Elec Prev Reading</label>
@@ -79,16 +131,6 @@
                                 <div>
                                     <label class="text-slate-400">Elec Current Reading</label>
                                     <input type="number" step="0.1" name="elec_curr_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                    <label class="text-slate-400">Water Prev Reading</label>
-                                    <input type="number" step="0.1" name="water_prev_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
-                                </div>
-                                <div>
-                                    <label class="text-slate-400">Water Current Reading</label>
-                                    <input type="number" step="0.1" name="water_curr_reading" value="0" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
                                 </div>
                             </div>
                         </div>
@@ -102,20 +144,20 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Notes / Remarks</label>
+                                <label class="block text-xs uppercase text-slate-400 font-bold mb-1">Notes</label>
                                 <input type="text" name="notes" placeholder="Optional notes" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs">
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/30">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-900/30">
                             Save Payment Record
                         </button>
                     </form>
                 </div>
 
-                <!-- Add Kirayedar Form -->
+                <!-- 3. ADD NEW KIRAYEDAR -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                     <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
-                        <span>👤</span> Add Kirayedar
+                        <span>👤</span> Add Naya Kirayedar
                     </h2>
                     <form action="/tenants/add" method="POST" enctype="multipart/form-data" class="space-y-3">
                         <div class="grid grid-cols-2 gap-3">
@@ -167,26 +209,41 @@
                                 <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-950 border border-slate-700 rounded p-1.5">
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-900/30">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-lg transition-all shadow-lg">
                             Add Tenant Profile
                         </button>
                     </form>
                 </div>
             </div>
 
-            <!-- Right Panel (7 cols) -->
+            <!-- Right Column: Profiles & Selective View -->
             <div class="lg:col-span-7 space-y-6">
-                <!-- Profiles + Family + Police Verification -->
-                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                    <h2 class="text-xl font-bold mb-4 flex items-center justify-between">
-                        <span>Kirayedar Profiles & Satyapan</span>
-                        <span class="text-xs bg-slate-800 px-3 py-1 rounded-full text-indigo-400">{{ tenants|length }} Tenants</span>
-                    </h2>
 
-                    <div class="space-y-4">
+                <!-- PROFILES SECTION -->
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                        <div>
+                            <h2 class="text-xl font-bold flex items-center gap-2">
+                                <span>Kirayedar Profiles</span>
+                                <span class="text-xs bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-2.5 py-0.5 rounded-full">{{ tenants|length }} Active</span>
+                            </h2>
+                            <p class="text-[11px] text-slate-400">Niche dropdown se jise select karenge sirf usi ki detail dikhegi</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="profile_filter_select" onchange="filterTenantProfile(this.value)" class="bg-slate-950 border border-indigo-500/50 text-indigo-300 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                                <option value="all">👁️ Show All Profiles</option>
+                                {% for t in tenants %}
+                                <option value="tenant-card-{{ t.id }}">{{ t.room_number }} - {{ t.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Current Active Tenants -->
+                    <div class="space-y-4 mt-4" id="active_tenants_container">
                         {% for t in tenants %}
-                        <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
-                            <!-- Tenant Top Row -->
+                        <div id="tenant-card-{{ t.id }}" class="tenant-card bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                            <!-- Tenant Header -->
                             <div class="flex items-start justify-between">
                                 <div class="flex items-center gap-3">
                                     {% if t.photo_path %}
@@ -207,20 +264,18 @@
                                         </p>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" onclick="openModal('edit-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded">Edit</button>
-                                    <a href="/tenants/{{ t.id }}/delete" onclick="return confirm('Kirayedar delete karein?')" class="text-xs bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded">Delete</a>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="openModal('edit-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 px-2 py-1 rounded">Edit</button>
+                                    <button type="button" onclick="openModal('leave-tenant-modal-{{ t.id }}')" class="cursor-pointer text-xs bg-orange-500/20 hover:bg-orange-500/40 text-orange-300 border border-orange-500/30 px-2 py-1 rounded" title="Room chhod diya">🚪 Left</button>
+                                    <a href="/tenants/{{ t.id }}/delete" onclick="return confirm('Kirayedar delete karein?')" class="text-xs bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 px-2 py-1 rounded">Del</a>
                                 </div>
                             </div>
 
-                            <!-- POLICE VERIFICATION BOX -->
+                            <!-- Police Stayan Box -->
                             <div class="mt-3 pt-3 border-t border-slate-800 bg-slate-900/50 p-3 rounded-lg">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                                        <span>🛡️</span> Police Satyapan Record
-                                    </span>
-                                </div>
-
+                                <span class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                    <span>🛡️</span> Police Satyapan Record
+                                </span>
                                 {% for v in t.verifications %}
                                 <div class="flex items-center justify-between bg-slate-950 border border-slate-800 p-2.5 rounded-lg text-xs mb-2">
                                     <div>
@@ -233,57 +288,40 @@
                                         <p class="text-[11px] text-slate-400 mt-0.5">
                                             Ref No: {{ v.verification_ref_no or 'N/A' }} | Date: {{ v.submission_date }}
                                             {% if v.document_path %}
-                                            | <a href="{{ v.document_path }}" target="_blank" class="text-cyan-400 underline font-semibold">View Police File (PDF/Image)</a>
+                                            | <a href="{{ v.document_path }}" target="_blank" class="text-cyan-400 underline font-semibold">View Police File</a>
                                             {% endif %}
                                         </p>
-                                        {% if v.remarks %}
-                                        <p class="text-[10px] text-slate-500 italic mt-0.5">Note: {{ v.remarks }}</p>
-                                        {% endif %}
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <button type="button" onclick="openModal('edit-police-modal-{{ v.id }}')" class="cursor-pointer text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Edit</button>
-                                        <a href="/police/{{ v.id }}/delete" onclick="return confirm('Police verification record delete karein?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Del</a>
+                                    <div class="flex items-center gap-1">
+                                        <button type="button" onclick="openModal('edit-police-modal-{{ v.id }}')" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">Edit</button>
+                                        <a href="/police/{{ v.id }}/delete" onclick="return confirm('Delete police record?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded">Del</a>
                                     </div>
                                 </div>
                                 {% else %}
-                                <p class="text-xs text-slate-500 italic mb-2">Abhi tak police stayan add nahi kiya gaya.</p>
+                                <p class="text-xs text-slate-500 italic mb-2">Abhi tak police stayan upload nahi hai.</p>
                                 {% endfor %}
 
                                 <details class="group">
-                                    <summary class="cursor-pointer text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1">
-                                        <span>+ Add / Upload Police Satyapan File</span>
-                                    </summary>
+                                    <summary class="cursor-pointer text-xs font-semibold text-rose-400 hover:text-rose-300">+ Add / Upload Police Satyapan Form</summary>
                                     <form action="/police/add" method="POST" enctype="multipart/form-data" class="mt-2 bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2 text-xs">
                                         <input type="hidden" name="tenant_id" value="{{ t.id }}">
                                         <div class="grid grid-cols-2 gap-2">
-                                            <input type="text" name="police_station" required placeholder="Police Thana / Station Name" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                            <input type="text" name="police_station" required placeholder="Police Thana Name" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
                                             <input type="text" name="verification_ref_no" placeholder="Reference / Receipt No" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
                                         <div class="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">Submission Date 📅</label>
-                                                <input type="date" name="submission_date" value="{{ today_date }}" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">Status</label>
-                                                <select name="status_val" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
-                                                    <option value="Submitted">Submitted</option>
-                                                    <option value="In Progress">In Progress</option>
-                                                    <option value="Verified">Verified</option>
-                                                </select>
-                                            </div>
+                                            <input type="date" name="submission_date" value="{{ today_date }}" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                            <select name="status_val" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+                                                <option value="Submitted">Submitted</option>
+                                                <option value="In Progress">In Progress</option>
+                                                <option value="Verified">Verified</option>
+                                            </select>
                                         </div>
                                         <div class="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">Upload Satyapan Form (PDF / Photo)</label>
-                                                <input type="file" name="document" accept="image/*,.pdf" required class="w-full text-slate-400">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">Remarks</label>
-                                                <input type="text" name="remarks" placeholder="Optional notes" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
-                                            </div>
+                                            <input type="file" name="document" accept="image/*,.pdf" required class="text-slate-400">
+                                            <input type="text" name="remarks" placeholder="Optional notes" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
-                                        <button type="submit" class="bg-rose-700 hover:bg-rose-600 font-bold px-3 py-1.5 rounded text-white shadow">Save Police Satyapan</button>
+                                        <button type="submit" class="bg-rose-700 hover:bg-rose-600 font-bold px-3 py-1.5 rounded text-white">Save Satyapan</button>
                                     </form>
                                 </details>
                             </div>
@@ -302,17 +340,14 @@
                                             {% endif %}
                                             <div>
                                                 <p class="font-semibold text-slate-200">{{ m.name }} <span class="text-slate-400 font-normal">({{ m.relation }}{% if m.age %}, {{ m.age }}y{% endif %})</span></p>
-                                                <p class="text-[10px] text-slate-400">
-                                                    📞 {{ m.phone or 'No phone' }} | 🪪 {{ m.id_type }}: {{ m.id_number or '-' }}
-                                                    {% if m.id_document_path %}
-                                                    | <a href="{{ m.id_document_path }}" target="_blank" class="text-indigo-400 underline">ID Doc</a>
-                                                    {% endif %}
+                                                <p class="text-[10px] text-slate-400">📞 {{ m.phone or '-' }} | 🪪 {{ m.id_type }}: {{ m.id_number or '-' }}
+                                                    {% if m.id_document_path %} | <a href="{{ m.id_document_path }}" target="_blank" class="text-indigo-400 underline">ID Doc</a>{% endif %}
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-1.5">
-                                            <button type="button" onclick="openModal('edit-member-modal-{{ m.id }}')" class="cursor-pointer text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Edit</button>
-                                            <a href="/members/{{ m.id }}/delete" onclick="return confirm('Family member delete karein?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Delete</a>
+                                        <div class="flex items-center gap-1">
+                                            <button type="button" onclick="openModal('edit-member-modal-{{ m.id }}')" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">Edit</button>
+                                            <a href="/members/{{ m.id }}/delete" onclick="return confirm('Delete family member?')" class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded">Del</a>
                                         </div>
                                     </div>
                                     {% else %}
@@ -321,13 +356,11 @@
                                 </div>
 
                                 <details class="group">
-                                    <summary class="cursor-pointer text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-                                        <span>+ Add Family Member</span>
-                                    </summary>
+                                    <summary class="cursor-pointer text-xs font-semibold text-indigo-400 hover:text-indigo-300">+ Add Family Member</summary>
                                     <form action="/tenants/{{ t.id }}/members/add" method="POST" enctype="multipart/form-data" class="mt-2 bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2 text-xs">
                                         <div class="grid grid-cols-3 gap-2">
                                             <input type="text" name="member_name" required placeholder="Name" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
-                                            <input type="text" name="relation" required placeholder="Relation (Wife/Son)" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
+                                            <input type="text" name="relation" required placeholder="Relation" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
                                             <input type="number" name="age" placeholder="Age" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
                                         <div class="grid grid-cols-3 gap-2">
@@ -340,14 +373,8 @@
                                             <input type="text" name="id_number" placeholder="ID Number" class="bg-slate-950 border border-slate-700 rounded p-1.5 text-white">
                                         </div>
                                         <div class="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">Photo</label>
-                                                <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] text-slate-400">ID Document</label>
-                                                <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
-                                            </div>
+                                            <input type="file" name="photo" accept="image/*" class="text-slate-400">
+                                            <input type="file" name="id_doc" accept="image/*,.pdf" class="text-slate-400">
                                         </div>
                                         <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 font-bold px-3 py-1.5 rounded text-white">Save Member Profile</button>
                                     </form>
@@ -355,23 +382,61 @@
                             </div>
                         </div>
                         {% else %}
-                        <p class="text-center py-6 text-slate-500">Abhi tak koi kirayedar nahi joda gaya.</p>
+                        <p class="text-center py-6 text-slate-500">Abhi tak koi current kirayedar nahi hai.</p>
                         {% endfor %}
+                    </div>
+
+                    <!-- 4. CHHODE HUE KIRAYEDAR (OLD / VACATED ARCHIVE) -->
+                    <div class="mt-8 pt-6 border-t border-slate-800">
+                        <details class="group">
+                            <summary class="cursor-pointer flex items-center justify-between text-sm font-bold text-slate-400 hover:text-white bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                                <span class="flex items-center gap-2">
+                                    <span>📦</span> Purane / Chhode Hue Kirayedar (Archive Records)
+                                </span>
+                                <span class="text-xs bg-orange-950 text-orange-300 border border-orange-700/50 px-2 py-0.5 rounded-full">{{ left_tenants|length }} Records</span>
+                            </summary>
+                            <div class="mt-3 space-y-3">
+                                {% for lt in left_tenants %}
+                                <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs opacity-80 hover:opacity-100 transition">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-bold text-slate-200">{{ lt.name }} <span class="text-slate-400">({{ lt.room_number }})</span></h4>
+                                            <p class="text-[11px] text-orange-400 font-semibold mt-0.5">🚪 Room Chhodne Ki Date: {{ lt.leaving_date or 'N/A' }} | 📞 {{ lt.phone or '-' }}</p>
+                                            <p class="text-[10px] text-slate-500">🪪 {{ lt.id_type }}: {{ lt.id_number or '-' }}
+                                                {% if lt.id_document_path %} | <a href="{{ lt.id_document_path }}" target="_blank" class="text-indigo-400 underline">ID File</a>{% endif %}
+                                                {% if lt.photo_path %} | <a href="{{ lt.photo_path }}" target="_blank" class="text-indigo-400 underline">Photo</a>{% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <a href="/tenants/{{ lt.id }}/restore" onclick="return confirm('Kya is kirayedar ko wapas Current list me shamil karna chahte hain?')" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded text-xs hover:bg-emerald-500/40">
+                                                🔄 Restore
+                                            </a>
+                                            <a href="/tenants/{{ lt.id }}/delete" onclick="return confirm('Permanent delete karein?')" class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded text-xs hover:bg-rose-500/40">
+                                                Delete
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-xs text-slate-500 italic py-2">Koi purana vacated kirayedar nahi hai.</p>
+                                {% endfor %}
+                            </div>
+                        </details>
                     </div>
                 </div>
 
-                <!-- Payment History Table -->
+                <!-- PAYMENT RECORDS TABLE -->
                 <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                    <h2 class="text-xl font-bold mb-4">Payment & Meter Reading Records</h2>
+                    <h2 class="text-xl font-bold mb-4">Payment & Meter Reading History</h2>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs">
                             <thead class="uppercase bg-slate-950 text-slate-400 border-b border-slate-800">
                                 <tr>
-                                    <th class="py-2.5 px-3">Room / Kirayedar</th>
+                                    <th class="py-2.5 px-3">Kirayedar / Room</th>
                                     <th class="py-2.5 px-2">Month</th>
                                     <th class="py-2.5 px-2 text-right">Fixed</th>
                                     <th class="py-2.5 px-2 text-right">Water</th>
-                                    <th class="py-2.5 px-2 text-right">Electricity</th>
+                                    <th class="py-2.5 px-2 text-right">Elec (₹7.5)</th>
                                     <th class="py-2.5 px-2 text-right">Other</th>
                                     <th class="py-2.5 px-2 text-right text-emerald-400 font-bold">Total</th>
                                     <th class="py-2.5 px-2 text-center">Actions</th>
@@ -385,10 +450,10 @@
                                         <div class="text-[10px] text-slate-400 font-normal">{{ p.payment_mode }} (Date: {{ p.payment_date }})</div>
                                         <div class="flex gap-2 mt-1 text-[10px]">
                                             <span class="bg-amber-950 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/40">
-                                                ⚡ Elec: {{ p.elec_prev_reading }} ➔ {{ p.elec_curr_reading }} ({{ (p.elec_curr_reading - p.elec_prev_reading)|round(1) }} u)
+                                                ⚡ {{ p.elec_prev_reading }} ➔ {{ p.elec_curr_reading }} ({{ (p.elec_curr_reading - p.elec_prev_reading)|round(1) }} u)
                                             </span>
                                             <span class="bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800/40">
-                                                💧 Water: {{ p.water_prev_reading }} ➔ {{ p.water_curr_reading }}
+                                                💧 ₹{{ p.water_bill }}
                                             </span>
                                         </div>
                                     </td>
@@ -401,7 +466,7 @@
                                     <td class="py-2.5 px-2 text-center">
                                         <div class="flex items-center justify-center gap-1.5">
                                             <button type="button" onclick="openModal('edit-pay-modal-{{ p.id }}')" class="cursor-pointer text-[10px] bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 px-2.5 py-1 rounded border border-amber-500/30">Edit</button>
-                                            <a href="/payments/{{ p.id }}/delete" onclick="return confirm('Payment record delete karein?')" class="text-[10px] bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 px-2 py-1 rounded border border-rose-500/30">Del</a>
+                                            <a href="/payments/{{ p.id }}/delete" onclick="return confirm('Delete payment entry?')" class="text-[10px] bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 px-2 py-1 rounded border border-rose-500/30">Del</a>
                                         </div>
                                     </td>
                                 </tr>
@@ -418,7 +483,30 @@
         </div>
     </div>
 
-    <!-- ================= ALL MODALS PLACED CLEANLY OUTSIDE TABLES ================= -->
+    <!-- ================= MODALS OUTSIDE TABLES ================= -->
+
+    <!-- Tenant Left Modal -->
+    {% for t in tenants %}
+    <div id="leave-tenant-modal-{{ t.id }}" style="display: none;" class="fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
+        <div class="bg-slate-900 border border-orange-500/40 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-sm text-orange-400">Room Chhodne Ka Record - {{ t.name }}</h3>
+                <button type="button" onclick="closeModal('leave-tenant-modal-{{ t.id }}')" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+            </div>
+            <p class="text-xs text-slate-300">Jab aap mark karenge, toh yeh kirayedar current dropdown se hat kar <b>Old / Archive List</b> me save ho jayega.</p>
+            <form action="/tenants/{{ t.id }}/leave" method="POST" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1 font-semibold">Room Chhodne Ki Taarikh (Date) 📅</label>
+                    <input type="date" name="leaving_date" value="{{ today_date }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white text-xs">
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('leave-tenant-modal-{{ t.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
+                    <button type="submit" class="bg-orange-600 hover:bg-orange-500 px-4 py-1.5 rounded text-white font-bold">Confirm Left Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
 
     <!-- Tenant Edit Modals -->
     {% for t in tenants %}
@@ -430,52 +518,28 @@
             </div>
             <form action="/tenants/{{ t.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-2 text-xs">
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Tenant Name</label>
-                        <input type="text" name="name" value="{{ t.name }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Room Number</label>
-                        <input type="text" name="room_number" value="{{ t.room_number }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
+                    <input type="text" name="name" value="{{ t.name }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                    <input type="text" name="room_number" value="{{ t.room_number }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Phone</label>
-                        <input type="text" name="phone" value="{{ t.phone or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Fixed Rent (₹)</label>
-                        <input type="number" step="0.01" name="monthly_rent" value="{{ t.monthly_rent }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
+                    <input type="text" name="phone" value="{{ t.phone or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                    <input type="number" step="0.01" name="monthly_rent" value="{{ t.monthly_rent }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">ID Type</label>
-                        <select name="id_type" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                            <option value="Aadhar Card" {% if t.id_type == 'Aadhar Card' %}selected{% endif %}>Aadhar Card</option>
-                            <option value="Voter ID" {% if t.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
-                            <option value="PAN Card" {% if t.id_type == 'PAN Card' %}selected{% endif %}>PAN Card</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">ID Number</label>
-                        <input type="text" name="id_number" value="{{ t.id_number or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
+                    <select name="id_type" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <option value="Aadhar Card" {% if t.id_type == 'Aadhar Card' %}selected{% endif %}>Aadhar Card</option>
+                        <option value="Voter ID" {% if t.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
+                        <option value="PAN Card" {% if t.id_type == 'PAN Card' %}selected{% endif %}>PAN Card</option>
+                    </select>
+                    <input type="text" name="id_number" value="{{ t.id_number or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">New Photo (Optional)</label>
-                        <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">New ID Doc (Optional)</label>
-                        <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
-                    </div>
+                    <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
+                    <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                    <button type="button" onclick="closeModal('edit-tenant-modal-{{ t.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white cursor-pointer">Cancel</button>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-white font-bold cursor-pointer">Save Changes</button>
+                    <button type="button" onclick="closeModal('edit-tenant-modal-{{ t.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-white font-bold">Save</button>
                 </div>
             </form>
         </div>
@@ -493,34 +557,20 @@
                 </div>
                 <form action="/members/{{ m.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-2 text-xs">
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" name="member_name" value="{{ m.name }}" required placeholder="Name" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                        <input type="text" name="relation" value="{{ m.relation }}" required placeholder="Relation" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="text" name="member_name" value="{{ m.name }}" required class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="text" name="relation" value="{{ m.relation }}" required class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" name="phone" value="{{ m.phone or '' }}" placeholder="Contact Phone" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                        <input type="number" name="age" value="{{ m.age or '' }}" placeholder="Age" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="text" name="phone" value="{{ m.phone or '' }}" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="number" name="age" value="{{ m.age or '' }}" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <select name="id_type" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                            <option value="Aadhar Card" {% if m.id_type == 'Aadhar Card' %}selected{% endif %}>Aadhar Card</option>
-                            <option value="Voter ID" {% if m.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
-                            <option value="PAN Card" {% if m.id_type == 'PAN Card' %}selected{% endif %}>PAN Card</option>
-                        </select>
-                        <input type="text" name="id_number" value="{{ m.id_number or '' }}" placeholder="ID Number" class="bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-[10px] text-slate-400">New Photo (Optional)</label>
-                            <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-slate-400">New ID Doc (Optional)</label>
-                            <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
-                        </div>
+                        <input type="file" name="photo" accept="image/*" class="w-full text-slate-400">
+                        <input type="file" name="id_doc" accept="image/*,.pdf" class="w-full text-slate-400">
                     </div>
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                        <button type="button" onclick="closeModal('edit-member-modal-{{ m.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white cursor-pointer">Cancel</button>
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-white font-bold cursor-pointer">Update</button>
+                        <button type="button" onclick="closeModal('edit-member-modal-{{ m.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-white font-bold">Update</button>
                     </div>
                 </form>
             </div>
@@ -538,41 +588,14 @@
                     <button type="button" onclick="closeModal('edit-police-modal-{{ v.id }}')" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
                 </div>
                 <form action="/police/{{ v.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-2 text-xs">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Police Thana / Station Name</label>
-                        <input type="text" name="police_station" value="{{ v.police_station }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                    </div>
+                    <input type="text" name="police_station" value="{{ v.police_station }}" required class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
                     <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-[10px] text-slate-400">Application/Ref No.</label>
-                            <input type="text" name="verification_ref_no" value="{{ v.verification_ref_no or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-slate-400">Submission Date 📅</label>
-                            <input type="date" name="submission_date" value="{{ v.submission_date }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-[10px] text-slate-400">Status</label>
-                            <select name="status_val" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
-                                <option value="Submitted" {% if v.status == 'Submitted' %}selected{% endif %}>Submitted</option>
-                                <option value="In Progress" {% if v.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                                <option value="Verified" {% if v.status == 'Verified' %}selected{% endif %}>Verified</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-slate-400">New File (Image/PDF)</label>
-                            <input type="file" name="document" accept="image/*,.pdf" class="w-full text-slate-400">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Remarks</label>
-                        <input type="text" name="remarks" value="{{ v.remarks or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="text" name="verification_ref_no" value="{{ v.verification_ref_no or '' }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
+                        <input type="date" name="submission_date" value="{{ v.submission_date }}" class="w-full bg-slate-950 border border-slate-700 p-2 rounded text-white">
                     </div>
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                        <button type="button" onclick="closeModal('edit-police-modal-{{ v.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white cursor-pointer">Cancel</button>
-                        <button type="submit" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded text-white font-bold cursor-pointer">Update Record</button>
+                        <button type="button" onclick="closeModal('edit-police-modal-{{ v.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
+                        <button type="submit" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded text-white font-bold">Update</button>
                     </div>
                 </form>
             </div>
@@ -590,96 +613,83 @@
             </div>
             <form action="/payments/{{ p.id }}/edit" method="POST" class="space-y-2 text-xs">
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Rent Month 📅</label>
-                        <input type="month" name="for_month" value="{{ p.for_month }}" required class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Payment Date 📅</label>
-                        <input type="date" name="payment_date" value="{{ p.payment_date }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
+                    <input type="month" name="for_month" value="{{ p.for_month }}" required class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <input type="date" name="payment_date" value="{{ p.payment_date }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Fixed Rent (₹)</label>
-                        <input type="number" step="0.01" name="fixed_rent" value="{{ p.fixed_rent }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Water Bill (₹)</label>
-                        <input type="number" step="0.01" name="water_bill" value="{{ p.water_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Electricity Bill (₹)</label>
-                        <input type="number" step="0.01" name="electricity_bill" value="{{ p.electricity_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Other Charges (₹)</label>
-                        <input type="number" step="0.01" name="other_charges" value="{{ p.other_charges }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
+                    <input type="number" step="0.01" name="fixed_rent" value="{{ p.fixed_rent }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <input type="number" step="0.01" name="water_bill" value="{{ p.water_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <input type="number" step="0.01" name="electricity_bill" value="{{ p.electricity_bill }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <input type="number" step="0.01" name="other_charges" value="{{ p.other_charges }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Elec Prev Reading</label>
-                        <input type="number" step="0.1" name="elec_prev_reading" value="{{ p.elec_prev_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Elec Curr Reading</label>
-                        <input type="number" step="0.1" name="elec_curr_reading" value="{{ p.elec_curr_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Water Prev Reading</label>
-                        <input type="number" step="0.1" name="water_prev_reading" value="{{ p.water_prev_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Water Curr Reading</label>
-                        <input type="number" step="0.1" name="water_curr_reading" value="{{ p.water_curr_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-slate-400">Payment Mode</label>
-                        <select name="payment_mode" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                            <option value="UPI" {% if p.payment_mode == 'UPI' %}selected{% endif %}>UPI</option>
-                            <option value="Cash" {% if p.payment_mode == 'Cash' %}selected{% endif %}>Cash</option>
-                            <option value="NetBanking" {% if p.payment_mode == 'NetBanking' %}selected{% endif %}>NetBanking</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-400">Notes / Remarks</label>
-                        <input type="text" name="notes" value="{{ p.notes or '' }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
-                    </div>
+                    <input type="number" step="0.1" name="elec_prev_reading" value="{{ p.elec_prev_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
+                    <input type="number" step="0.1" name="elec_curr_reading" value="{{ p.elec_curr_reading }}" class="w-full bg-slate-950 border border-slate-700 p-1.5 rounded text-white">
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                    <button type="button" onclick="closeModal('edit-pay-modal-{{ p.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white cursor-pointer">Cancel</button>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded text-white font-bold cursor-pointer">Update Record</button>
+                    <button type="button" onclick="closeModal('edit-pay-modal-{{ p.id }}')" class="bg-slate-700 px-3 py-1.5 rounded text-white">Cancel</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded text-white font-bold">Update</button>
                 </div>
             </form>
         </div>
     </div>
     {% endfor %}
 
-    <!-- Pure Reliable JavaScript Modal Functions -->
+    <!-- JavaScript Handlers -->
     <script>
         function openModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) {
-                modal.style.display = 'flex';
-            }
+            const m = document.getElementById(id);
+            if (m) m.style.display = 'flex';
         }
 
         function closeModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) {
-                modal.style.display = 'none';
-            }
+            const m = document.getElementById(id);
+            if (m) m.style.display = 'none';
         }
 
-        // Close modal when user clicks on background overlay
+        // Close on outside click
         window.addEventListener('click', function(e) {
             if (e.target.classList.contains('fixed') && e.target.classList.contains('z-50')) {
                 e.target.style.display = 'none';
             }
         });
+
+        // 1. Sync Dropdowns & Rent value
+        function syncTenantSelect(tenantId) {
+            if (!tenantId) return;
+            const waSelect = document.getElementById('wa_tenant_select');
+            const mainSelect = document.getElementById('main_tenant_select');
+            const filterSelect = document.getElementById('profile_filter_select');
+            
+            if (waSelect) waSelect.value = tenantId;
+            if (mainSelect) mainSelect.value = tenantId;
+
+            // Auto-filter right side to show ONLY this tenant
+            if (filterSelect) {
+                filterSelect.value = 'tenant-card-' + tenantId;
+                filterTenantProfile('tenant-card-' + tenantId);
+            }
+
+            // Auto-update rent amount input
+            const selectedOpt = mainSelect.querySelector(`option[value="${tenantId}"]`);
+            if (selectedOpt && selectedOpt.dataset.rent) {
+                document.getElementById('record_fixed_rent').value = selectedOpt.dataset.rent;
+            }
+        }
+
+        // 2. Selective View Filter (Sirf chune hue kirayedar ki detail dikhana)
+        function filterTenantProfile(cardId) {
+            const cards = document.querySelectorAll('.tenant-card');
+            cards.forEach(card => {
+                if (cardId === 'all') {
+                    card.style.display = 'block';
+                } else if (card.id === cardId) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
     </script>
 </body>
 </html>
