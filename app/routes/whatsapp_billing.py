@@ -9,10 +9,10 @@ from app.database import async_session, Tenant, RentPayment
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# Default Settings (Change as needed)
+# Updated Default Settings
 DEFAULT_WATER_BILL = 100.0
-DEFAULT_ELEC_UNIT_RATE = 7.0
-YOUR_UPI_ID = "your_upi_id@upi"  # Apna UPI ID yahan dalein
+DEFAULT_ELEC_UNIT_RATE = 7.5  # Rate updated to 7.5 per unit
+YOUR_UPI_ID = "your_upi_id@upi"
 YOUR_NAME = "Nitin Tripathi"
 
 async def get_db():
@@ -40,13 +40,10 @@ async def generate_bill(
     fixed_rent = tenant.monthly_rent
     total_amount = round(fixed_rent + water_bill + elec_bill + other_charges, 2)
 
-    # Generate Dynamic UPI Payment Deep Link
+    # Dynamic UPI Payment Deep Link
     upi_payment_link = f"upi://pay?pa={YOUR_UPI_ID}&pn={urllib.parse.quote(YOUR_NAME)}&am={total_amount}&cu=INR&tn=Rent-{for_month}"
-    
-    # Generate Free QR Code Image URL (Google Charts API)
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(upi_payment_link)}"
 
-    # WhatsApp Pre-filled Text Message
     msg = (
         f"Namaste {tenant.name} ji,\n"
         f"Aapke Kamra No. {tenant.room_number} ka {for_month} mahine ka rent bill:\n\n"
@@ -80,7 +77,7 @@ async def quick_mark_paid(
     other_charges: float = Form(0.0),
     elec_prev_reading: float = Form(0.0),
     elec_curr_reading: float = Form(0.0),
-    payment_mode: str = Form("UPI"), # UPI or Cash
+    payment_mode: str = Form("UPI"),
     db: AsyncSession = Depends(get_db)
 ):
     total_amount = float(fixed_rent) + float(water_bill) + float(electricity_bill) + float(other_charges)
