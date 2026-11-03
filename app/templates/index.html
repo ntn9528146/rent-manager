@@ -31,7 +31,7 @@
             <!-- Left Column: Forms -->
             <div class="lg:col-span-5 space-y-6">
 
-                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (Auto-Saves to DB with Pending/Paid Toggle) -->
+                <!-- 1. INSTANT WHATSAPP BILL GENERATOR (With Live Total Pay Calculation) -->
                 <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6 rounded-2xl border border-emerald-800/60 shadow-xl">
                     <h2 class="text-lg font-bold text-emerald-400 mb-1 flex items-center gap-2">
                         <span>📲</span> WhatsApp Auto-Bill & QR Generator
@@ -55,28 +55,42 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Paani (Fixed ₹)</label>
-                                <input type="number" step="0.01" name="water_bill" value="100.0" readonly class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-cyan-300 font-bold">
+                                <input type="number" step="0.01" id="wa_water_bill" name="water_bill" value="100.0" readonly class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-cyan-300 font-bold">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Other Charges (₹)</label>
-                                <input type="number" step="0.01" name="other_charges" value="0.0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                                <input type="number" step="0.01" id="wa_other_charges" name="other_charges" value="0.0" oninput="calculateLiveTotal()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-[11px] text-slate-400 font-semibold">Previous Reading</label>
-                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
+                                <input type="number" step="0.1" id="wa_prev_reading" name="prev_reading" value="0.0" oninput="calculateLiveTotal()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-amber-400 font-bold">Current Reading ⚡</label>
-                                <input type="number" step="0.1" id="wa_curr_reading" name="curr_reading" required placeholder="Enter Current" class="w-full bg-slate-950 border border-amber-500 rounded p-2 text-xs text-white font-semibold">
+                                <input type="number" step="0.1" id="wa_curr_reading" name="curr_reading" required placeholder="Enter Current" oninput="calculateLiveTotal()" class="w-full bg-slate-950 border border-amber-500 rounded p-2 text-xs text-white font-semibold">
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-xs bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                            <span class="text-slate-400">Bijli Rate: <b class="text-amber-400">₹7.5 / Unit</b></span>
-                            <input type="hidden" name="unit_rate" value="7.5">
-                            <span class="text-slate-400">Paani: <b class="text-cyan-400">₹100</b></span>
+
+                        <!-- LIVE BREAKUP & TOTAL DUE HIGHLIGHT BOX -->
+                        <div class="bg-slate-950/90 p-3 rounded-xl border border-emerald-600/40 space-y-1.5">
+                            <div class="flex items-center justify-between text-xs text-slate-300">
+                                <span>Bijli: <span id="wa_units_display" class="font-bold text-amber-400">0 unit</span> × ₹7.5</span>
+                                <span id="wa_elec_amt_display" class="font-semibold text-amber-300">₹0.0</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-400">
+                                <span>Fixed Rent + Paani (₹100)</span>
+                                <span id="wa_fixed_plus_water" class="font-semibold text-slate-300">₹0.0</span>
+                            </div>
+                            <div class="pt-1.5 border-t border-slate-800 flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-wider font-extrabold text-emerald-400">Kul Rashi (Total Due):</span>
+                                <span id="wa_total_pay_display" class="text-lg font-black text-emerald-400">₹0.0</span>
+                            </div>
                         </div>
+
+                        <input type="hidden" name="unit_rate" value="7.5">
+
                         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-2.5 rounded-lg transition-all shadow-lg text-sm flex items-center justify-center gap-2">
                             <span>📲</span> Send WhatsApp Bill with QR Code
                         </button>
@@ -613,7 +627,7 @@
     </div>
     {% endfor %}
 
-    <!-- Pure Selective JavaScript Filters (Synchronized Profiles & Payment History) -->
+    <!-- JavaScript Handlers -->
     <script>
         function openModal(id) {
             const m = document.getElementById(id);
@@ -631,11 +645,38 @@
             }
         });
 
-        // SINGLE SYNC FUNCTION: Dropdown select karte hi Profile + Payment List dono filter hongi
+        // LIVE REAL-TIME TOTAL DUE CALCULATOR
+        function calculateLiveTotal() {
+            const waSelect = document.getElementById('wa_tenant_select');
+            let fixedRent = 0;
+            if (waSelect && waSelect.selectedIndex >= 0) {
+                const opt = waSelect.options[waSelect.selectedIndex];
+                if (opt && opt.dataset.rent) {
+                    fixedRent = parseFloat(opt.dataset.rent) || 0;
+                }
+            }
+
+            const waterBill = parseFloat(document.getElementById('wa_water_bill').value) || 100.0;
+            const otherCharges = parseFloat(document.getElementById('wa_other_charges').value) || 0.0;
+            const prevReading = parseFloat(document.getElementById('wa_prev_reading').value) || 0.0;
+            const currReading = parseFloat(document.getElementById('wa_curr_reading').value) || 0.0;
+
+            const units = Math.max(0, (currReading - prevReading));
+            const elecRate = 7.5;
+            const elecAmount = units * elecRate;
+            const totalDue = fixedRent + waterBill + elecAmount + otherCharges;
+
+            // Update UI elements
+            document.getElementById('wa_units_display').innerText = units.toFixed(1) + ' unit';
+            document.getElementById('wa_elec_amt_display').innerText = '₹' + elecAmount.toFixed(1);
+            document.getElementById('wa_fixed_plus_water').innerText = '₹' + (fixedRent + waterBill).toFixed(1);
+            document.getElementById('wa_total_pay_display').innerText = '₹' + totalDue.toFixed(1);
+        }
+
+        // SYNC DROPDOWNS & FILTER
         function syncTenantSelect(tenantId) {
             if (!tenantId) return;
 
-            // 1. Sync dropdown boxes
             const waSelect = document.getElementById('wa_tenant_select');
             const mainSelect = document.getElementById('main_tenant_select');
             const filterSelect = document.getElementById('profile_filter_select');
@@ -644,7 +685,7 @@
             if (mainSelect && mainSelect.value !== tenantId) mainSelect.value = tenantId;
             if (filterSelect && filterSelect.value !== tenantId) filterSelect.value = tenantId;
 
-            // 2. Filter Profiles on Right
+            // Filter Profiles on Right
             const tenantCards = document.querySelectorAll('.tenant-card');
             tenantCards.forEach(card => {
                 if (tenantId === 'all' || card.dataset.tenantId === String(tenantId)) {
@@ -654,13 +695,11 @@
                 }
             });
 
-            // 3. Filter Payment History Records on Right
+            // Filter Payment History Records on Right
             const paymentRows = document.querySelectorAll('.payment-row');
-            let visibleCount = 0;
             paymentRows.forEach(row => {
                 if (tenantId === 'all' || row.dataset.tenantId === String(tenantId)) {
                     row.style.display = '';
-                    visibleCount++;
                 } else {
                     row.style.display = 'none';
                 }
@@ -677,16 +716,18 @@
                 }
             }
 
-            // 4. Update Fixed Rent Input
+            // Update Fixed Rent in second form
             if (mainSelect && tenantId !== 'all') {
                 const opt = mainSelect.querySelector(`option[value="${tenantId}"]`);
                 if (opt && opt.dataset.rent) {
                     document.getElementById('record_fixed_rent').value = opt.dataset.rent;
                 }
             }
+
+            // Recalculate live total for the selected tenant
+            calculateLiveTotal();
         }
 
-        // Default: On page load, agar kirayedar maujood hain toh pehle wale ko select karke filter set karein
         document.addEventListener('DOMContentLoaded', function() {
             const firstOpt = document.querySelector('#profile_filter_select option:nth-child(2)');
             if (firstOpt && firstOpt.value !== 'all') {
