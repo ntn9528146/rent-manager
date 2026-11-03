@@ -22,6 +22,7 @@ load_dotenv()
 from app.database import async_session, init_db, engine, User, Tenant, FamilyMember, RentPayment, PoliceVerification
 from app.routes.police import router as police_router
 from app.routes.whatsapp_billing import router as billing_router
+from app.utils_otp import generate_otp, send_otp_email
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME", "etuvojxj"),
@@ -123,7 +124,7 @@ async def save_uploaded_file(file: Optional[UploadFile], subfolder: str) -> Opti
         print(f"File upload warning: {e}")
         return None
 
-# --- AUTH ROUTES ---
+# --- AUTH & SECURE OTP ROUTES ---
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
@@ -149,51 +150,74 @@ async def login_action(
     response.set_cookie(key=COOKIE_NAME, value=token, httponly=True, max_age=cookie_max_age)
     return response
 
+# Public Signup Disabled
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    return HTMLResponse("<h3>403 Forbidden: Public Signup band kar diya gaya hai.</h3>", status_code=403)
+
+@app.post("/signup")
+async def signup_action(request: Request):
+    return HTMLResponse("<h3>403 Forbidden: Public Signup band kar diya gaya hai.</h3>", status_code=403)
+
+# OTP Password Reset Endpoints
 @app.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page(request: Request):
-    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": None})
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": None, "otp_sent": False})
 
-@app.post("/reset-password")
-async def reset_password_action(
+@app.post("/request-otp")
+async def request_otp_action(
     request: Request,
     username: str = Form(...),
+    email: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(User).where(User.username == username.strip()))
+    user = result.scalar_one_or_none()
+    if not user:
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Yeh username registered nahi hai!", "msg": None, "otp_sent": False})
+
+    otp = generate_otp()
+    user.otp_code = otp
+    user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    user.email = email.strip()
+    await db.commit()
+
+    sent = send_otp_email(email.strip(), otp)
+    if not sent:
+        print(f"\n🔔 [CONSOLE BACKUP OTP]: User {username} ka OTP hai -> {otp}\n")
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": f"OTP generate ho gaya hai! (Console check karein: {otp})", "otp_sent": True, "username": user.username})
+
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": f"6-Digit OTP aapke email ({email}) par bhej diya gaya hai! Kripya apna Inbox/Spam check karein.", "otp_sent": True, "username": user.username})
+
+@app.post("/verify-otp-reset")
+async def verify_otp_reset_action(
+    request: Request,
+    username: str = Form(...),
+    otp: str = Form(...),
     new_password: str = Form(...),
     confirm_password: str = Form(...),
     db: AsyncSession = Depends(get_db)
 ):
     if new_password != confirm_password:
-        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Dono password match nahi hue!", "msg": None})
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Dono password match nahi hue!", "msg": None, "otp_sent": True, "username": username})
 
     result = await db.execute(select(User).where(User.username == username.strip()))
     user = result.scalar_one_or_none()
     if not user:
-        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Yeh username registered nahi hai!", "msg": None})
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "User nahi mila!", "msg": None, "otp_sent": False})
+
+    if not user.otp_code or user.otp_code.strip() != otp.strip():
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "Galat OTP! Kripya sahi OTP enter karein.", "msg": None, "otp_sent": True, "username": username})
+
+    if user.otp_expiry and datetime.utcnow() > user.otp_expiry:
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": "OTP expire ho chuka hai! Dobara request karein.", "msg": None, "otp_sent": False})
 
     user.hashed_password = hash_password(new_password)
+    user.otp_code = None
+    user.otp_expiry = None
     await db.commit()
-    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": "Password kamyabi se update ho gaya! Ab aap login kar sakte hain."})
 
-@app.get("/signup", response_class=HTMLResponse)
-async def signup_page(request: Request):
-    return templates.TemplateResponse(request=request, name="signup.html", context={"error": None})
-
-@app.post("/signup")
-async def signup_action(
-    request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
-    full_name: str = Form(""),
-    db: AsyncSession = Depends(get_db)
-):
-    result = await db.execute(select(User).where(User.username == username.strip()))
-    if result.scalar_one_or_none():
-        return templates.TemplateResponse(request=request, name="signup.html", context={"error": "Username pehle se maujood hai!"})
-
-    hashed = hash_password(password)
-    user = User(username=username.strip(), hashed_password=hashed, full_name=full_name.strip())
-    db.add(user)
-    await db.commit()
-    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={"error": None, "msg": "Password kamyabi se update ho gaya! Ab aap login kar sakte hain.", "otp_sent": False})
 
 @app.get("/logout")
 async def logout():
@@ -201,7 +225,7 @@ async def logout():
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# --- DASHBOARD WITH ROOM-BASED LATEST READING LOOKUP ---
+# --- MAIN DASHBOARD WITH AUTO READING & FILTER ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_current_user(request, db)
@@ -232,7 +256,6 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
     )
     payments = result_payments.scalars().all()
 
-    # Room number ke according sabse latest electricity current reading map karna
     room_last_readings = {}
     for p in payments:
         if p.tenant and p.tenant.room_number:
@@ -240,7 +263,6 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
             if rm not in room_last_readings:
                 room_last_readings[rm] = float(p.elec_curr_reading or 0.0)
 
-    # Har active tenant ke sath uske room ki latest reading jodna
     tenant_list_with_readings = []
     for t in active_tenants:
         rm = t.room_number.strip()
@@ -519,7 +541,7 @@ async def delete_family_member(member_id: int, request: Request, db: AsyncSessio
         await db.commit()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-# --- COMPLETELY BULLETPROOF PAYMENT EDIT & RECORD ---
+# --- PAYMENT CRUD ---
 @app.post("/payments/record")
 async def record_payment(
     request: Request,
